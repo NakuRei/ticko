@@ -65,7 +65,7 @@ sw.start()
 lap1 = sw.lap()
 lap2 = sw.lap()
 
-sw.stop()
+elapsed =sw.stop()
 ```
 
 ### Custom Callbacks
@@ -77,6 +77,21 @@ def log_time(sw: StopWatch):
 @stopwatch(exit_callback=log_time)
 def my_function():
     pass
+```
+
+### Thread Safety
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+sw = StopWatch()
+sw.start()
+
+# Multiple threads can safely share one StopWatch
+with ThreadPoolExecutor(max_workers=5) as executor:
+    futures = [executor.submit(sw.lap) for _ in range(10)]
+
+elapsed =sw.stop()
 ```
 
 For more examples, see the [`examples/`](examples/) directory.
