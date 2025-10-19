@@ -104,9 +104,12 @@ Decorator for automatic function timing with optional custom callbacks.
 
 ```bash
 # Install with dev dependencies
-uv add --dev --editable .
+uv sync --dev
 
 # Run tests
+pytest tests/
+
+# Run tests with coverage report
 pytest tests -v --cov=src --cov-report=term-missing --cov-report=xml:cov.xml
 
 # Type checking
