@@ -1,6 +1,7 @@
 # ticko
 
 [![CI](https://github.com/NakuRei/ticko/actions/workflows/ci.yml/badge.svg)](https://github.com/NakuRei/ticko/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/NakuRei/ticko/graph/badge.svg)](https://codecov.io/gh/NakuRei/ticko)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
