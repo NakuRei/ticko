@@ -7,7 +7,26 @@ authors = [
     { name = "NakuRei", email = "nakurei7901@gmail.com" }
 ]
 requires-python = ">=3.10"
+keywords = ["stopwatch", "timer", "performance", "profiling", "benchmark"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Benchmark",
+    "Typing :: Typed",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/NakuRei/ticko"
+Repository = "https://github.com/NakuRei/ticko"
+Issues = "https://github.com/NakuRei/ticko/issues"
 
 [build-system]
 requires = ["uv_build>=0.9.4,<0.10.0"]
