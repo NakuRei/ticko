@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2025-10-19
+## [1.0.0] - 2025-10-19
 
 ### Added
 
@@ -23,5 +23,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Code coverage reporting with Codecov
 
-[unreleased]: https://github.com/NakuRei/ticko/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/NakuRei/ticko/releases/tag/v0.1.0
+[unreleased]: https://github.com/NakuRei/ticko/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/NakuRei/ticko/releases/tag/v1.0.0
