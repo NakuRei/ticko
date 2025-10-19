@@ -12,3 +12,41 @@ dependencies = []
 [build-system]
 requires = ["uv_build>=0.9.4,<0.10.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "lxml>=6.0.2",
+    "mypy>=1.18.2",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.1",
+    "ticko",
+]
+
+[tool.ruff]
+line-length = 80
+indent-width = 4
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "S101", # assert
+    "D203", # incorrect-blank-line-before-class
+    "D213", # multi-line-summary-second-line
+    "COM812", # disabled to prevent conflicts with the formatter (trailing comma handling)
+]
+per-file-ignores = { "examples/**" = ["T201", "INP001"], "tests/**" = ["INP001", "PLR2004", "ARG005", "D401", "D404", "TRY003", "EM101", "BLE001", "PERF203"] }
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+ticko = { workspace = true, editable = true }
