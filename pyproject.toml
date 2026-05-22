@@ -29,16 +29,16 @@ Repository = "https://github.com/NakuRei/ticko"
 Issues = "https://github.com/NakuRei/ticko/issues"
 
 [build-system]
-requires = ["uv_build>=0.9.4,<0.10.0"]
+requires = ["uv_build>=0.11.16,<0.12.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "lxml>=6.0.2",
-    "mypy>=1.18.2",
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.14.1",
+    "lxml>=6.1.1",
+    "mypy>=2.1.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.14",
     "ticko",
 ]
 
