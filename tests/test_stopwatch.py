@@ -311,3 +311,27 @@ class TestStopwatchRealTime:
 
         assert lap1 > 0.04
         assert lap2 > 0.04
+
+
+class TestStopwatchContextManagerEarlyStop:
+    """Test context manager handles early stop gracefully."""
+
+    def test_context_manager_early_stop(self, stopwatch: Stopwatch) -> None:
+        """Test context manager does not raise when stop() already called."""
+        with stopwatch:
+            stopwatch.stop()
+        # __exit__ should not raise even though stopwatch is already stopped
+        assert not stopwatch.is_running
+
+    def test_context_manager_early_stop_with_exception(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test original exception is not masked when stop() called early."""
+
+        def _trigger() -> None:
+            with stopwatch:
+                stopwatch.stop()
+                raise ValueError("early stop")
+
+        with pytest.raises(ValueError, match="early stop"):
+            _trigger()

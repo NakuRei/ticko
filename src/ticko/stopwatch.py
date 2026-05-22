@@ -326,5 +326,10 @@ class Stopwatch:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """Exit the context manager and stop the stopwatch."""
-        self.stop()
+        """Exit the context manager and stop the stopwatch.
+
+        If the stopwatch was already stopped before the context exits,
+        this method does nothing to avoid raising NotStartedError.
+        """
+        if self.is_running:
+            self.stop()
