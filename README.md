@@ -67,7 +67,7 @@ sw.start()
 lap1 = sw.lap()
 lap2 = sw.lap()
 
-elapsed =sw.stop()
+elapsed = sw.stop()
 ```
 
 ### Custom Callbacks
@@ -93,7 +93,7 @@ sw.start()
 with ThreadPoolExecutor(max_workers=5) as executor:
     futures = [executor.submit(sw.lap) for _ in range(10)]
 
-elapsed =sw.stop()
+elapsed = sw.stop()
 ```
 
 For more examples, see the [`examples/`](examples/) directory.
