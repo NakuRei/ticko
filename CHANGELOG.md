@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release of ticko
 - `StopWatch` class for thread-safe stopwatch functionality
-  - Start, stop, pause, and resume operations
+  - Start, stop, lap, and reset operations
   - Lap timing support
   - Elapsed time measurement
 - `@stopwatch` decorator for easy function timing
