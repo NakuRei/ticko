@@ -13,12 +13,17 @@ from ticko import Stopwatch
 def worker(task_id: int, sw: Stopwatch) -> tuple[int, float]:
     """Simulate work and record a lap time.
 
-    Args:
-        task_id: Task identifier
-        sw: Shared Stopwatch instance
+    Parameters
+    ----------
+    task_id : int
+        Task identifier.
+    sw : Stopwatch
+        Shared Stopwatch instance.
 
-    Returns:
-        Tuple of (task_id, lap_time)
+    Returns
+    -------
+    tuple[int, float]
+        Tuple of (task_id, lap_time).
 
     """
     # Simulate work with varying duration per task

@@ -269,9 +269,12 @@ class Stopwatch:
     def __repr__(self) -> str:
         """Return a string representation for recreating the Stopwatch.
 
-        Returns a string showing the constructor parameters, following the
-        Python convention that repr() should return a string that could be
-        used to recreate the object.
+        Returns
+        -------
+        str
+            A string showing the constructor parameters, following the
+            Python convention that repr() should return a string that
+            could be used to recreate the object.
         """
         timer_name = getattr(
             self._timer_func,
@@ -294,8 +297,12 @@ class Stopwatch:
     def __str__(self) -> str:
         """Return a human-readable string representation.
 
-        Returns a string describing the current state of the stopwatch,
-        including whether it's running and the elapsed time if applicable.
+        Returns
+        -------
+        str
+            A string describing the current state of the stopwatch,
+            including whether it's running and the elapsed time if
+            applicable.
         """
         with self._lock:
             if self._time_start is None:
