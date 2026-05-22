@@ -1,0 +1,11 @@
+{
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "strict",
+  "reportUnknownMemberType": "information",
+  "reportMissingImports": "error",
+  "reportMissingSuperCall": "error",
+  "reportMissingParameterType": "error",
+  "reportMissingModuleSource": "error",
+  "reportMissingTypeArgument": "error",
+  "reportMissingTypeStubs": "information"
+}
