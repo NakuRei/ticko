@@ -1,10 +1,10 @@
-"""Tests for thread safety of StopWatch."""
+"""Tests for thread safety of Stopwatch."""
 
 import threading
 import time
 from typing import Any
 
-from ticko.stop_watch import AlreadyRunningError, NotStartedError, StopWatch
+from ticko.stopwatch import AlreadyRunningError, NotStartedError, Stopwatch
 
 
 class TestThreadSafety:
@@ -12,7 +12,7 @@ class TestThreadSafety:
 
     def test_concurrent_property_reads(self) -> None:
         """Test reading properties from multiple threads."""
-        sw = StopWatch()
+        sw = Stopwatch()
         sw.start()
         results: list[tuple[str, Any]] = []
         errors: list[Exception] = []
@@ -37,7 +37,7 @@ class TestThreadSafety:
 
     def test_concurrent_laps(self) -> None:
         """Test recording laps from multiple threads."""
-        sw = StopWatch()
+        sw = Stopwatch()
         sw.start()
         lap_times: list[float] = []
         errors: list[Exception] = []
@@ -66,7 +66,7 @@ class TestThreadSafety:
 
     def test_concurrent_start_attempts(self) -> None:
         """Test multiple threads trying to start stopwatch."""
-        sw = StopWatch()
+        sw = Stopwatch()
         start_count = 0
         error_count = 0
         lock = threading.Lock()
@@ -95,7 +95,7 @@ class TestThreadSafety:
 
     def test_concurrent_stop_attempts(self) -> None:
         """Test multiple threads trying to stop stopwatch."""
-        sw = StopWatch()
+        sw = Stopwatch()
         sw.start()
         time.sleep(0.01)  # Let it run for a bit
 
@@ -126,7 +126,7 @@ class TestThreadSafety:
 
     def test_reset_while_reading(self) -> None:
         """Test resetting while other threads are reading."""
-        sw = StopWatch()
+        sw = Stopwatch()
         sw.start()
         time.sleep(0.01)
 
@@ -180,7 +180,7 @@ class TestThreadSafety:
 
         def use_context_manager() -> None:
             try:
-                sw = StopWatch()
+                sw = Stopwatch()
                 with sw:
                     time.sleep(0.01)
                     elapsed = sw.time_elapsed
@@ -206,12 +206,12 @@ class TestThreadSafety:
         callback_calls: list[float] = []
         lock = threading.Lock()
 
-        def thread_safe_callback(sw: StopWatch) -> None:
+        def thread_safe_callback(sw: Stopwatch) -> None:
             with lock:
                 callback_calls.append(sw.time_elapsed)
 
         def run_stopwatch() -> None:
-            sw = StopWatch(exit_callback=thread_safe_callback)
+            sw = Stopwatch(exit_callback=thread_safe_callback)
             sw.start()
             time.sleep(0.001)
             sw.stop()
@@ -230,7 +230,7 @@ class TestRaceConditions:
 
     def test_start_stop_race(self) -> None:
         """Test rapid start/stop cycles."""
-        sw = StopWatch()
+        sw = Stopwatch()
         errors: list[Exception] = []
 
         for _ in range(100):
@@ -245,7 +245,7 @@ class TestRaceConditions:
 
     def test_lap_property_consistency(self) -> None:
         """Test that lap times and properties remain consistent."""
-        sw = StopWatch()
+        sw = Stopwatch()
         sw.start()
 
         for _ in range(50):

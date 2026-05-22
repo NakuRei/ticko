@@ -24,10 +24,10 @@ pip install ticko
 ## Quick Start
 
 ```python
-from ticko import StopWatch
+from ticko import Stopwatch
 
 # Basic usage
-with StopWatch() as sw:
+with Stopwatch() as sw:
     # Your code here
     pass
 
@@ -51,7 +51,7 @@ process_data()  # Automatically prints execution time
 ### Manual Control
 
 ```python
-sw = StopWatch()
+sw = Stopwatch()
 sw.start()
 # ... your code ...
 elapsed = sw.stop()
@@ -60,7 +60,7 @@ elapsed = sw.stop()
 ### Lap Timing
 
 ```python
-sw = StopWatch()
+sw = Stopwatch()
 sw.start()
 
 # Record multiple laps
@@ -73,7 +73,7 @@ elapsed =sw.stop()
 ### Custom Callbacks
 
 ```python
-def log_time(sw: StopWatch):
+def log_time(sw: Stopwatch):
     logger.info(f"Execution took {sw.time_elapsed:.3f}s")
 
 @stopwatch(exit_callback=log_time)
@@ -86,10 +86,10 @@ def my_function():
 ```python
 from concurrent.futures import ThreadPoolExecutor
 
-sw = StopWatch()
+sw = Stopwatch()
 sw.start()
 
-# Multiple threads can safely share one StopWatch
+# Multiple threads can safely share one Stopwatch
 with ThreadPoolExecutor(max_workers=5) as executor:
     futures = [executor.submit(sw.lap) for _ in range(10)]
 
@@ -100,7 +100,7 @@ For more examples, see the [`examples/`](examples/) directory.
 
 ## API Overview
 
-### `StopWatch`
+### `Stopwatch`
 
 **Properties:**
 - `is_running: bool` - Current state

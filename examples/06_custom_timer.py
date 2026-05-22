@@ -1,11 +1,11 @@
-"""Using custom timer function with StopWatch."""
+"""Using custom timer function with Stopwatch."""
 
 import time
 
-from ticko import StopWatch
+from ticko import Stopwatch
 
 # Use time.time instead of default time.perf_counter
-sw = StopWatch(timer_func=time.time)
+sw = Stopwatch(timer_func=time.time)
 sw.start()
 
 time.sleep(0.5)

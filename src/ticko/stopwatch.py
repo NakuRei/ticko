@@ -10,24 +10,24 @@ from typing import Final, final
 logger = logging.getLogger(__name__)
 
 
-class StopWatchError(Exception):
-    """Base class for StopWatch exceptions."""
+class StopwatchError(Exception):
+    """Base class for Stopwatch exceptions."""
 
 
-class InvalidStateError(StopWatchError):
+class InvalidStateError(StopwatchError):
     """Raised when an operation is attempted in an invalid state."""
 
 
-class AlreadyRunningError(StopWatchError):
+class AlreadyRunningError(StopwatchError):
     """Raised when trying to start an already running stopwatch."""
 
 
-class NotStartedError(StopWatchError):
+class NotStartedError(StopwatchError):
     """Raised when stopping or lapping a stopwatch that hasn't been started."""
 
 
 @final
-class StopWatch:
+class Stopwatch:
     """Thread-safe stopwatch for measuring elapsed time.
 
     This class provides methods to start, stop, lap, and reset a stopwatch. It
@@ -38,8 +38,8 @@ class StopWatch:
     ----------
     timer_func : Callable[[], float], optional
         Function returning the current time (default: time.perf_counter).
-    exit_callback : Callable[[StopWatch], None] | None, optional
-        Optional callback invoked with the StopWatch instance when the
+    exit_callback : Callable[[Stopwatch], None] | None, optional
+        Optional callback invoked with the Stopwatch instance when the
         stopwatch is stopped. If None, no callback is invoked.
 
     Attributes
@@ -70,7 +70,7 @@ class StopWatch:
 
     Examples
     --------
-    >>> sw = StopWatch()
+    >>> sw = Stopwatch()
     >>> sw.start()
     >>> time.sleep(1)
     >>> sw.lap()
@@ -91,7 +91,7 @@ class StopWatch:
     def __init__(
         self,
         timer_func: Callable[[], float] = time.perf_counter,
-        exit_callback: Callable[["StopWatch"], None] | None = None,
+        exit_callback: Callable[["Stopwatch"], None] | None = None,
     ) -> None:
         """Initialize the stopwatch.
 
@@ -99,7 +99,7 @@ class StopWatch:
         ----------
         timer_func : Callable[[], float], optional
             Function returning the current time (default: time.perf_counter).
-        exit_callback : Callable[[StopWatch], None] | None, optional
+        exit_callback : Callable[[Stopwatch], None] | None, optional
             Optional callback invoked when the stopwatch is stopped.
 
         """
@@ -267,7 +267,7 @@ class StopWatch:
         return time_elapsed
 
     def __repr__(self) -> str:
-        """Return a string representation for recreating the StopWatch.
+        """Return a string representation for recreating the Stopwatch.
 
         Returns a string showing the constructor parameters, following the
         Python convention that repr() should return a string that could be
@@ -288,7 +288,7 @@ class StopWatch:
             )
         )
         return (
-            f"StopWatch(timer_func={timer_name}, exit_callback={callback_name})"
+            f"Stopwatch(timer_func={timer_name}, exit_callback={callback_name})"
         )
 
     def __str__(self) -> str:
@@ -299,16 +299,16 @@ class StopWatch:
         """
         with self._lock:
             if self._time_start is None:
-                return "StopWatch(not started)"
+                return "Stopwatch(not started)"
             if self._is_running:
                 elapsed = self._timer_func() - self._time_start
-                return f"StopWatch(running, elapsed={elapsed:.6f}s)"
+                return f"Stopwatch(running, elapsed={elapsed:.6f}s)"
             if self._time_stop is not None:
                 elapsed = self._time_stop - self._time_start
-                return f"StopWatch(stopped, elapsed={elapsed:.6f}s)"
-            return "StopWatch(invalid state)"  # This is unreachable
+                return f"Stopwatch(stopped, elapsed={elapsed:.6f}s)"
+            return "Stopwatch(invalid state)"  # This is unreachable
 
-    def __enter__(self) -> "StopWatch":
+    def __enter__(self) -> "Stopwatch":
         """Enter the context manager and start the stopwatch."""
         self.start()
         return self

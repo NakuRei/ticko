@@ -2,10 +2,10 @@
 
 import time
 
-from ticko import StopWatch, stopwatch
+from ticko import Stopwatch, stopwatch
 
 
-def custom_callback(sw: StopWatch) -> None:
+def custom_callback(sw: Stopwatch) -> None:
     """Log execution time.
 
     Custom callback to log execution time.

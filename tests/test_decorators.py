@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from ticko.decorators import stopwatch
-from ticko.stop_watch import StopWatch
+from ticko.stopwatch import Stopwatch
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ class TestStopwatchDecorator:
         assert result == 7
         callback.assert_called_once()
         sw_arg = callback.call_args[0][0]
-        assert isinstance(sw_arg, StopWatch)
+        assert isinstance(sw_arg, Stopwatch)
         assert sw_arg.time_elapsed == 1.0
 
     def test_decorator_preserves_function_metadata(self) -> None:
@@ -147,7 +147,7 @@ class TestStopwatchDecoratorRealTime:
         """Test decorator with actual time delays."""
         times: list[float] = []
 
-        def capture_callback(sw: StopWatch) -> None:
+        def capture_callback(sw: Stopwatch) -> None:
             times.append(sw.time_elapsed)
 
         @stopwatch(exit_callback=capture_callback)

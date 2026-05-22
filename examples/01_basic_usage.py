@@ -2,10 +2,10 @@
 
 import time
 
-from ticko import StopWatch
+from ticko import Stopwatch
 
 # Create and start a stopwatch
-sw = StopWatch()
+sw = Stopwatch()
 sw.start()
 
 # Simulate some work

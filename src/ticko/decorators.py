@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 from typing import ParamSpec, TypeVar, overload
 
-from .stop_watch import StopWatch
+from .stopwatch import Stopwatch
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def stopwatch(
     func: None = None,
     *,
     timer_func: Callable[[], float] = time.perf_counter,
-    exit_callback: Callable[[StopWatch], None] | None = None,
+    exit_callback: Callable[[Stopwatch], None] | None = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 
 
@@ -36,9 +36,9 @@ def stopwatch(
     func: Callable[P, R] | None = None,
     *,
     timer_func: Callable[[], float] = time.perf_counter,
-    exit_callback: Callable[[StopWatch], None] | None = None,
+    exit_callback: Callable[[Stopwatch], None] | None = None,
 ) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
-    """Measure the execution time of a function using StopWatch.
+    """Measure the execution time of a function using Stopwatch.
 
     Parameters
     ----------
@@ -46,8 +46,8 @@ def stopwatch(
         The function to decorate. If None, returns a decorator function.
     timer_func : Callable[[], float], optional
         Function returning the current time (default: time.perf_counter).
-    exit_callback : Callable[[StopWatch], None] | None, optional
-        Optional callback invoked with the StopWatch instance when the
+    exit_callback : Callable[[Stopwatch], None] | None, optional
+        Optional callback invoked with the Stopwatch instance when the
         decorated function exits. If None, a default callback is used that
         prints the elapsed time to standard output.
 
@@ -58,7 +58,7 @@ def stopwatch(
 
     Notes
     -----
-    The StopWatch is stopped regardless of whether the decorated function
+    The Stopwatch is stopped regardless of whether the decorated function
     returns normally or raises an exception. If an exception occurs it is
     re-raised after the stopwatch has been stopped; exit_callback is still
     invoked.
@@ -79,7 +79,7 @@ def stopwatch(
             callback = exit_callback
             if callback is None:
 
-                def _default_callback(sw: StopWatch) -> None:
+                def _default_callback(sw: Stopwatch) -> None:
                     print(  # noqa: T201
                         f"Function {f.__name__!r} executed "
                         f"in {sw.time_elapsed:.6f} seconds",
@@ -87,7 +87,7 @@ def stopwatch(
 
                 callback = _default_callback
 
-            sw = StopWatch(timer_func=timer_func, exit_callback=callback)
+            sw = Stopwatch(timer_func=timer_func, exit_callback=callback)
             sw.start()
             try:
                 return f(*args, **kwargs)

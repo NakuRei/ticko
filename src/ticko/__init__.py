@@ -1,12 +1,12 @@
 """Ticko: A simple and flexible stopwatch library for Python.
 
 This package provides utilities for measuring execution time in Python programs.
-It includes a thread-safe StopWatch class for manual timing control and a
+It includes a thread-safe Stopwatch class for manual timing control and a
 decorator for automatically measuring function execution times.
 
 Classes
 -------
-StopWatch
+Stopwatch
     Thread-safe stopwatch for measuring elapsed time with start, stop, lap,
     and reset functionality.
 
@@ -26,9 +26,9 @@ Using the decorator:
 Function 'compute' executed in 0.000123 seconds
 499500
 
-Using the StopWatch class directly:
+Using the Stopwatch class directly:
 
->>> sw = StopWatch()
+>>> sw = Stopwatch()
 >>> sw.start()
 >>> # ... do some work ...
 >>> sw.lap()
@@ -37,9 +37,9 @@ Using the StopWatch class directly:
 >>> sw.stop()
 2.567
 
-Using StopWatch as a context manager:
+Using Stopwatch as a context manager:
 
->>> with StopWatch() as sw:
+>>> with Stopwatch() as sw:
 ...     # ... do some work ...
 ...     pass
 >>> sw.time_elapsed
@@ -48,9 +48,9 @@ Using StopWatch as a context manager:
 """
 
 from .decorators import stopwatch
-from .stop_watch import StopWatch
+from .stopwatch import Stopwatch
 
 __all__ = [
-    "StopWatch",
+    "Stopwatch",
     "stopwatch",
 ]
