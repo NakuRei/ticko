@@ -8,12 +8,13 @@ repos:
       - id: ruff-format
         types_or: [python, pyi]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.20.2
+  - repo: local
     hooks:
       - id: mypy
-        args: []
-        additional_dependencies: []
+        name: mypy
+        entry: uv run --locked mypy src tests examples
+        language: system
+        pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
