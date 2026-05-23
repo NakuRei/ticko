@@ -160,7 +160,7 @@ class TestStopwatchContextManager:
         ):
             assert stopwatch.is_running
             raise ValueError("Test exception")
-        assert not stopwatch.is_running  # type: ignore[unreachable]
+        assert not stopwatch.is_running
         assert stopwatch.time_stop is not None
 
 
