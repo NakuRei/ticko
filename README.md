@@ -127,19 +127,19 @@ uv sync --dev
 uv run pre-commit install
 
 # Run tests
-pytest tests/
+uv run pytest tests/
 
 # Run tests with coverage report
-pytest tests -v --cov=src --cov-report=term-missing --cov-report=xml:cov.xml
+uv run pytest tests -v --cov=src --cov-report=term-missing --cov-report=xml:cov.xml
 
 # Type checking
-mypy .
+uv run mypy .
 
 # Lint checking
-ruff check
+uv run ruff check
 
 # Format checking
-ruff format --check --diff
+uv run ruff format --check --diff
 ```
 
 ## License
