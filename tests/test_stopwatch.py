@@ -32,8 +32,7 @@ class TestStopwatchBasicOperations:
 
     def test_start(self, stopwatch: Stopwatch) -> None:
         """Test starting the stopwatch."""
-        start_time = stopwatch.start()
-        assert start_time == 0.0
+        stopwatch.start()
         assert stopwatch.is_running
         assert stopwatch.time_start == 0.0
         assert stopwatch.time_last_lap_start == 0.0
@@ -75,8 +74,7 @@ class TestStopwatchBasicOperations:
         stopwatch.start()  # time = 0.0
         stopwatch.stop()  # time = 1.0
         stopwatch.reset()
-        start_time = stopwatch.start()  # time = 2.0
-        assert start_time == 2.0
+        stopwatch.start()  # time = 2.0
         assert stopwatch.is_running
 
 

@@ -59,7 +59,7 @@ class Stopwatch:
 
     Methods
     -------
-    start() -> float
+    start() -> None
         Start the stopwatch.
     lap() -> float
         Record a lap time.
@@ -190,7 +190,7 @@ class Stopwatch:
             self._is_running = False
             logger.debug("Stopwatch has been reset.")
 
-    def start(self) -> float:
+    def start(self) -> None:
         """Start the stopwatch."""
         with self._lock:
             if self._is_running:
@@ -205,7 +205,6 @@ class Stopwatch:
             self._time_stop = None
             self._is_running = True
             logger.debug("Stopwatch started at %f.", time_current)
-            return time_current
 
     def lap(self) -> float:
         """Record a lap time."""
