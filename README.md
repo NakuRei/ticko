@@ -123,6 +123,9 @@ Decorator for automatic function timing with optional custom callbacks.
 # Install with dev dependencies
 uv sync --dev
 
+# Install pre-commit hooks
+uv run pre-commit install
+
 # Run tests
 pytest tests/
 
