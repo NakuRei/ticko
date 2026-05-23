@@ -69,7 +69,7 @@ jobs:
         run: uv run ruff format --check src/ tests/ examples/
 
       - name: Run mypy
-        run: uv run mypy src/ticko examples/
+        run: uv run mypy src/ticko examples/ tests/
 
   build:
     name: Build Package
