@@ -1,14 +1,11 @@
 """Decorator for measuring function execution time."""
 
 import functools
-import logging
 import time
 from collections.abc import Callable
 from typing import ParamSpec, TypeVar, overload
 
 from .stopwatch import Stopwatch
-
-logger = logging.getLogger(__name__)
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -91,11 +88,6 @@ def stopwatch(
             sw.start()
             try:
                 return f(*args, **kwargs)
-            except Exception:
-                logger.exception(
-                    "Exception in stopwatch-decorated function",
-                )
-                raise
             finally:
                 sw.stop()
 
