@@ -1,5 +1,6 @@
 """Tests for the Stopwatch class."""
 
+import logging
 import time
 from unittest.mock import Mock
 
@@ -215,6 +216,70 @@ class TestStopwatchCallbacks:
         elapsed = sw.stop()
         assert elapsed == 10.0
         assert custom_timer.call_count == 2
+
+
+class TestStopwatchName:
+    """Test Stopwatch name parameter."""
+
+    def test_name_default_is_none(self, stopwatch: Stopwatch) -> None:
+        """Test default name is None."""
+        assert stopwatch.name is None
+
+    def test_name_set(self, mock_timer: Mock) -> None:
+        """Test name is stored correctly."""
+        sw = Stopwatch(name="my_sw", timer_func=mock_timer)
+        assert sw.name == "my_sw"
+
+    def test_str_includes_name_not_started(self, mock_timer: Mock) -> None:
+        """Test __str__ includes name when not started."""
+        sw = Stopwatch(name="db", timer_func=mock_timer)
+        assert "'db'" in str(sw)
+        assert "not started" in str(sw)
+
+    def test_str_includes_name_running(self, mock_timer: Mock) -> None:
+        """Test __str__ includes name while running."""
+        sw = Stopwatch(name="db", timer_func=mock_timer)
+        sw.start()  # time = 0.0
+        result = str(sw)  # time = 1.0
+        assert "'db'" in result
+        assert "running" in result
+
+    def test_str_includes_name_stopped(self, mock_timer: Mock) -> None:
+        """Test __str__ includes name after stopping."""
+        sw = Stopwatch(name="db", timer_func=mock_timer)
+        sw.start()  # time = 0.0
+        sw.stop()  # time = 1.0
+        result = str(sw)
+        assert "'db'" in result
+        assert "stopped" in result
+
+    def test_repr_includes_name(self, mock_timer: Mock) -> None:
+        """Test __repr__ includes name when set."""
+        sw = Stopwatch(name="db", timer_func=mock_timer)
+        assert "name='db'" in repr(sw)
+
+    def test_repr_omits_name_when_none(self, stopwatch: Stopwatch) -> None:
+        """Test __repr__ omits name when not set."""
+        assert "name=" not in repr(stopwatch)
+
+    def test_log_includes_name_on_start(
+        self, mock_timer: Mock, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Test log message includes name on start."""
+        sw = Stopwatch(name="timer_a", timer_func=mock_timer)
+        with caplog.at_level(logging.DEBUG, logger="ticko.stopwatch"):
+            sw.start()
+        assert "timer_a" in caplog.text
+
+    def test_log_includes_name_on_stop(
+        self, mock_timer: Mock, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Test log message includes name on stop."""
+        sw = Stopwatch(name="timer_b", timer_func=mock_timer)
+        sw.start()
+        with caplog.at_level(logging.DEBUG, logger="ticko.stopwatch"):
+            sw.stop()
+        assert "timer_b" in caplog.text
 
 
 class TestStopwatchRepr:

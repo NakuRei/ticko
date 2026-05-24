@@ -41,6 +41,9 @@ class Stopwatch:
 
     Parameters
     ----------
+    name : str | None, optional
+        Optional name for identifying this stopwatch in log messages and
+        string representations (default: None).
     timer_func : Callable[[], float], optional
         Function returning the current time (default: time.perf_counter).
     exit_callback : Callable[[Stopwatch], None] | None, optional
@@ -49,6 +52,8 @@ class Stopwatch:
 
     Attributes
     ----------
+    name : str | None
+        The name of the stopwatch, or None if not named.
     is_running : bool
         Indicates whether the stopwatch is currently running.
     time_start : float | None
@@ -95,6 +100,7 @@ class Stopwatch:
 
     def __init__(
         self,
+        name: str | None = None,
         timer_func: Callable[[], float] = time.perf_counter,
         exit_callback: Callable[["Stopwatch"], None] | None = None,
     ) -> None:
@@ -102,14 +108,21 @@ class Stopwatch:
 
         Parameters
         ----------
+        name : str | None, optional
+            Optional name for identifying this stopwatch in log messages and
+            string representations (default: None).
         timer_func : Callable[[], float], optional
             Function returning the current time (default: time.perf_counter).
         exit_callback : Callable[[Stopwatch], None] | None, optional
             Optional callback invoked when the stopwatch is stopped.
 
         """
+        self._name: Final = name
         self._timer_func: Final = timer_func
         self._exit_callback: Final = exit_callback
+        self._log_name: Final = (
+            f"Stopwatch[{name!r}]" if name is not None else "Stopwatch"
+        )
 
         self._time_start: float | None = None
         self._time_last_lap_start: float | None = None
@@ -118,6 +131,11 @@ class Stopwatch:
         self._lap_recorded: bool = False
 
         self._lock = threading.Lock()  # For thread safety
+
+    @property
+    def name(self) -> str | None:
+        """Get the name of the stopwatch."""
+        return self._name
 
     @property
     def is_running(self) -> bool:
@@ -187,7 +205,7 @@ class Stopwatch:
             self._time_stop = None
             self._is_running = False
             self._lap_recorded = False
-            logger.debug("Stopwatch has been reset.")
+            logger.debug("%s has been reset.", self._log_name)
 
     def start(self) -> None:
         """Start the stopwatch."""
@@ -204,7 +222,7 @@ class Stopwatch:
             self._time_stop = None
             self._lap_recorded = False
             self._is_running = True
-            logger.debug("Stopwatch started at %f.", time_current)
+            logger.debug("%s started at %f.", self._log_name, time_current)
 
     def lap(self) -> float:
         """Record a lap time."""
@@ -224,7 +242,8 @@ class Stopwatch:
             self._time_last_lap_start = time_current
             self._lap_recorded = True
             logger.debug(
-                "Lap recorded at %f with duration %f.",
+                "%s lap recorded at %f with duration %f.",
+                self._log_name,
                 time_current,
                 lap_duration,
             )
@@ -249,7 +268,8 @@ class Stopwatch:
             time_elapsed: Final = self._time_stop - self._time_start
             self._is_running = False
             logger.debug(
-                "Stopwatch stopped at %f with elapsed time %f.",
+                "%s stopped at %f with elapsed time %f.",
+                self._log_name,
                 time_current,
                 time_elapsed,
             )
@@ -296,9 +316,11 @@ class Stopwatch:
             if self._exit_callback is None
             else _callable_name(self._exit_callback)
         )
-        return (
-            f"Stopwatch(timer_func={timer_name}, exit_callback={callback_name})"
+        name_part = f"name={self._name!r}, " if self._name is not None else ""
+        body = (
+            f"{name_part}timer_func={timer_name}, exit_callback={callback_name}"
         )
+        return f"Stopwatch({body})"
 
     def __str__(self) -> str:
         """Return a human-readable string representation.
@@ -311,14 +333,15 @@ class Stopwatch:
             applicable.
         """
         with self._lock:
+            name_part = f"{self._name!r}, " if self._name is not None else ""
             if self._time_start is None:
-                return "Stopwatch(not started)"
+                return f"Stopwatch({name_part}not started)"
             if self._is_running:
                 elapsed = self._timer_func() - self._time_start
-                return f"Stopwatch(running, elapsed={elapsed:.6f}s)"
+                return f"Stopwatch({name_part}running, elapsed={elapsed:.6f}s)"
             if self._time_stop is not None:
                 elapsed = self._time_stop - self._time_start
-                return f"Stopwatch(stopped, elapsed={elapsed:.6f}s)"
+                return f"Stopwatch({name_part}stopped, elapsed={elapsed:.6f}s)"
             msg = "Invariant: _time_stop must be set when stopped."
             raise AssertionError(msg)
 
