@@ -213,6 +213,7 @@ class Stopwatch:
             self._time_start = time_current
             self._time_last_lap_start = time_current
             self._time_stop = None
+            self._lap_recorded = False
             self._is_running = True
             logger.debug("Stopwatch started at %f.", time_current)
 
