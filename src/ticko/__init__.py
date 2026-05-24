@@ -13,8 +13,12 @@ StopwatchError
     Base class for all Stopwatch exceptions.
 AlreadyRunningError
     Raised when trying to start an already running stopwatch.
+NotRunningError
+    Raised when stop() or lap() is called while the stopwatch is not running.
 NotStartedError
-    Raised when stopping or lapping a stopwatch that hasn't been started.
+    Raised when accessing time_elapsed before start() has ever been called.
+NoLapsRecordedError
+    Raised when accessing time_last_lap before any lap has been recorded.
 InvalidStateError
     Raised when an operation is attempted in an invalid state.
 
@@ -59,6 +63,8 @@ from .decorators import stopwatch
 from .stopwatch import (
     AlreadyRunningError,
     InvalidStateError,
+    NoLapsRecordedError,
+    NotRunningError,
     NotStartedError,
     Stopwatch,
     StopwatchError,
@@ -67,6 +73,8 @@ from .stopwatch import (
 __all__ = [
     "AlreadyRunningError",
     "InvalidStateError",
+    "NoLapsRecordedError",
+    "NotRunningError",
     "NotStartedError",
     "Stopwatch",
     "StopwatchError",

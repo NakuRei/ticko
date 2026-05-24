@@ -22,8 +22,16 @@ class AlreadyRunningError(StopwatchError):
     """Raised when trying to start an already running stopwatch."""
 
 
+class NotRunningError(StopwatchError):
+    """Raised when stop() or lap() is called while not running."""
+
+
 class NotStartedError(StopwatchError):
-    """Raised when stopping or lapping a stopwatch that hasn't been started."""
+    """Raised when accessing time_elapsed before start() has been called."""
+
+
+class NoLapsRecordedError(StopwatchError):
+    """Raised when accessing time_last_lap before any lap has been recorded."""
 
 
 @final
@@ -169,7 +177,7 @@ class Stopwatch:
                     "No laps have been recorded. "
                     "Call lap() after starting the stopwatch."
                 )
-                raise NotStartedError(msg)
+                raise NoLapsRecordedError(msg)
 
             if self._is_running:
                 return self._timer_func() - self._time_last_lap_start
@@ -216,7 +224,7 @@ class Stopwatch:
                     "Stopwatch is not running. "
                     "Call start() first before recording a lap."
                 )
-                raise NotStartedError(msg)
+                raise NotRunningError(msg)
             if self._time_last_lap_start is None:
                 # Invariant check: should not happen if running
                 msg = "Last lap start time should not be None if running."
@@ -241,7 +249,7 @@ class Stopwatch:
                     "Stopwatch is not running. "
                     "Call start() first before stopping."
                 )
-                raise NotStartedError(msg)
+                raise NotRunningError(msg)
             if self._time_start is None:
                 # Invariant check: should not happen if running
                 msg = "Start time should not be None if running."
@@ -339,7 +347,7 @@ class Stopwatch:
         """Exit the context manager and stop the stopwatch.
 
         If the stopwatch was already stopped before the context exits,
-        this method does nothing to avoid raising NotStartedError.
+        this method does nothing to avoid raising NotRunningError.
         """
         if self.is_running:
             self.stop()

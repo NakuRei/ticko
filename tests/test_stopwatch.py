@@ -5,7 +5,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from ticko.stopwatch import AlreadyRunningError, NotStartedError, Stopwatch
+from ticko.stopwatch import (
+    AlreadyRunningError,
+    NoLapsRecordedError,
+    NotRunningError,
+    NotStartedError,
+    Stopwatch,
+)
 
 
 @pytest.fixture
@@ -54,7 +60,7 @@ class TestStopwatchBasicOperations:
 
     def test_stop_not_started(self, stopwatch: Stopwatch) -> None:
         """Test stopping a non-running stopwatch raises error."""
-        with pytest.raises(NotStartedError, match="not running"):
+        with pytest.raises(NotRunningError, match="not running"):
             stopwatch.stop()
 
     def test_reset(self, stopwatch: Stopwatch) -> None:
@@ -94,7 +100,7 @@ class TestStopwatchLapFunctionality:
 
     def test_lap_not_started(self, stopwatch: Stopwatch) -> None:
         """Test recording lap on non-running stopwatch raises error."""
-        with pytest.raises(NotStartedError, match="not running"):
+        with pytest.raises(NotRunningError, match="not running"):
             stopwatch.lap()
 
 
@@ -136,7 +142,7 @@ class TestStopwatchProperties:
 
     def test_time_last_lap_no_laps(self, stopwatch: Stopwatch) -> None:
         """Test getting last lap time with no laps raises error."""
-        with pytest.raises(NotStartedError, match="No laps"):
+        with pytest.raises(NoLapsRecordedError, match="No laps"):
             _ = stopwatch.time_last_lap
 
     def test_time_last_lap_no_laps_after_start(
@@ -144,7 +150,7 @@ class TestStopwatchProperties:
     ) -> None:
         """Test time_last_lap before any lap() raises error."""
         stopwatch.start()
-        with pytest.raises(NotStartedError, match="No laps"):
+        with pytest.raises(NoLapsRecordedError, match="No laps"):
             _ = stopwatch.time_last_lap
 
 

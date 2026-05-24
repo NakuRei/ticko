@@ -4,7 +4,12 @@ import threading
 import time
 from typing import Any
 
-from ticko.stopwatch import AlreadyRunningError, NotStartedError, Stopwatch
+from ticko.stopwatch import (
+    AlreadyRunningError,
+    NotRunningError,
+    NotStartedError,
+    Stopwatch,
+)
 
 
 class TestThreadSafety:
@@ -109,7 +114,7 @@ class TestThreadSafety:
                 sw.stop()
                 with lock:
                     stop_count += 1
-            except NotStartedError:
+            except NotRunningError:
                 with lock:
                     error_count += 1
 
