@@ -9,6 +9,14 @@ Classes
 Stopwatch
     Thread-safe stopwatch for measuring elapsed time with start, stop, lap,
     and reset functionality.
+StopwatchError
+    Base class for all Stopwatch exceptions.
+AlreadyRunningError
+    Raised when trying to start an already running stopwatch.
+NotStartedError
+    Raised when stopping or lapping a stopwatch that hasn't been started.
+InvalidStateError
+    Raised when an operation is attempted in an invalid state.
 
 Functions
 ---------
@@ -48,9 +56,19 @@ Using Stopwatch as a context manager:
 """
 
 from .decorators import stopwatch
-from .stopwatch import Stopwatch
+from .stopwatch import (
+    AlreadyRunningError,
+    InvalidStateError,
+    NotStartedError,
+    Stopwatch,
+    StopwatchError,
+)
 
 __all__ = [
+    "AlreadyRunningError",
+    "InvalidStateError",
+    "NotStartedError",
     "Stopwatch",
+    "StopwatchError",
     "stopwatch",
 ]
