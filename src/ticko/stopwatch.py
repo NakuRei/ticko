@@ -100,6 +100,7 @@ class Stopwatch:
 
     def __init__(
         self,
+        *,
         name: str | None = None,
         timer_func: Callable[[], float] = time.perf_counter,
         exit_callback: Callable[["Stopwatch"], None] | None = None,
