@@ -70,20 +70,20 @@ def stopwatch(
 
     def _create_wrapper(f: Callable[P, R]) -> Callable[P, R]:
         """Create the wrapper function for the given function."""
+        if exit_callback is None:
+
+            def _default_callback(sw: Stopwatch) -> None:
+                print(  # noqa: T201
+                    f"Function {f.__name__!r} executed "
+                    f"in {sw.time_elapsed:.6f} seconds",
+                )
+
+            callback: Callable[[Stopwatch], None] = _default_callback
+        else:
+            callback = exit_callback
 
         @functools.wraps(f)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            callback = exit_callback
-            if callback is None:
-
-                def _default_callback(sw: Stopwatch) -> None:
-                    print(  # noqa: T201
-                        f"Function {f.__name__!r} executed "
-                        f"in {sw.time_elapsed:.6f} seconds",
-                    )
-
-                callback = _default_callback
-
             sw = Stopwatch(timer_func=timer_func, exit_callback=callback)
             sw.start()
             try:
