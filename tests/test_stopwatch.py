@@ -139,6 +139,14 @@ class TestStopwatchProperties:
         with pytest.raises(NotStartedError, match="No laps"):
             _ = stopwatch.time_last_lap
 
+    def test_time_last_lap_no_laps_after_start(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test time_last_lap before any lap() raises error."""
+        stopwatch.start()
+        with pytest.raises(NotStartedError, match="No laps"):
+            _ = stopwatch.time_last_lap
+
 
 class TestStopwatchContextManager:
     """Test context manager functionality."""

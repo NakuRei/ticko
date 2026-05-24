@@ -110,6 +110,7 @@ class Stopwatch:
         self._time_last_lap_start: float | None = None
         self._time_stop: float | None = None
         self._is_running: bool = False
+        self._lap_recorded: bool = False
 
         self._lock = threading.Lock()  # For thread safety
 
@@ -163,7 +164,7 @@ class Stopwatch:
     def time_last_lap(self) -> float:
         """Get the elapsed time of the last lap."""
         with self._lock:
-            if self._time_last_lap_start is None:
+            if not self._lap_recorded or self._time_last_lap_start is None:
                 msg = (
                     "No laps have been recorded. "
                     "Call lap() after starting the stopwatch."
@@ -188,6 +189,7 @@ class Stopwatch:
             self._time_last_lap_start = None
             self._time_stop = None
             self._is_running = False
+            self._lap_recorded = False
             logger.debug("Stopwatch has been reset.")
 
     def start(self) -> None:
@@ -223,6 +225,7 @@ class Stopwatch:
             time_current: Final = self._timer_func()
             lap_duration: Final = time_current - self._time_last_lap_start
             self._time_last_lap_start = time_current
+            self._lap_recorded = True
             logger.debug(
                 "Lap recorded at %f with duration %f.",
                 time_current,
