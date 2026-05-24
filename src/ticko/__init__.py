@@ -19,8 +19,6 @@ NotStartedError
     Raised when accessing time_elapsed before start() has ever been called.
 NoLapsRecordedError
     Raised when accessing time_last_lap before any lap has been recorded.
-InvalidStateError
-    Raised when an operation is attempted in an invalid state.
 
 Functions
 ---------
@@ -62,7 +60,6 @@ Using Stopwatch as a context manager:
 from .decorators import stopwatch
 from .stopwatch import (
     AlreadyRunningError,
-    InvalidStateError,
     NoLapsRecordedError,
     NotRunningError,
     NotStartedError,
@@ -72,7 +69,6 @@ from .stopwatch import (
 
 __all__ = [
     "AlreadyRunningError",
-    "InvalidStateError",
     "NoLapsRecordedError",
     "NotRunningError",
     "NotStartedError",

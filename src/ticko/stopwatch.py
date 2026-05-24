@@ -14,10 +14,6 @@ class StopwatchError(Exception):
     """Base class for Stopwatch exceptions."""
 
 
-class InvalidStateError(StopwatchError):
-    """Raised when an operation is attempted in an invalid state."""
-
-
 class AlreadyRunningError(StopwatchError):
     """Raised when trying to start an already running stopwatch."""
 
@@ -161,12 +157,8 @@ class Stopwatch:
                 return self._timer_func() - self._time_start
             if self._time_stop is not None:
                 return self._time_stop - self._time_start
-            # This is unreachable
-            msg = (
-                "Stopwatch is in an invalid state. "
-                "Call reset() to reinitialize."
-            )
-            raise InvalidStateError(msg)
+            msg = "Invariant: _time_stop must be set when stopped."
+            raise AssertionError(msg)
 
     @property
     def time_last_lap(self) -> float:
@@ -183,12 +175,8 @@ class Stopwatch:
                 return self._timer_func() - self._time_last_lap_start
             if self._time_stop is not None:
                 return self._time_stop - self._time_last_lap_start
-            # This is unreachable
-            msg = (
-                "Stopwatch is in an invalid state. "
-                "Call reset() to reinitialize."
-            )
-            raise InvalidStateError(msg)
+            msg = "Invariant: _time_stop must be set when stopped."
+            raise AssertionError(msg)
 
     def reset(self) -> None:
         """Reset the stopwatch to its initial state."""
@@ -227,9 +215,8 @@ class Stopwatch:
                 )
                 raise NotRunningError(msg)
             if self._time_last_lap_start is None:
-                # Invariant check: should not happen if running
-                msg = "Last lap start time should not be None if running."
-                raise InvalidStateError(msg)
+                msg = "Invariant: _time_last_lap_start is None while running."
+                raise AssertionError(msg)
 
             time_current: Final = self._timer_func()
             lap_duration: Final = time_current - self._time_last_lap_start
@@ -252,9 +239,8 @@ class Stopwatch:
                 )
                 raise NotRunningError(msg)
             if self._time_start is None:
-                # Invariant check: should not happen if running
-                msg = "Start time should not be None if running."
-                raise InvalidStateError(msg)
+                msg = "Invariant: _time_start is None while running."
+                raise AssertionError(msg)
 
             time_current: Final = self._timer_func()
             self._time_stop = time_current
@@ -332,7 +318,8 @@ class Stopwatch:
             if self._time_stop is not None:
                 elapsed = self._time_stop - self._time_start
                 return f"Stopwatch(stopped, elapsed={elapsed:.6f}s)"
-            return "Stopwatch(invalid state)"  # This is unreachable
+            msg = "Invariant: _time_stop must be set when stopped."
+            raise AssertionError(msg)
 
     def __enter__(self) -> "Stopwatch":
         """Enter the context manager and start the stopwatch."""
