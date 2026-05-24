@@ -276,21 +276,29 @@ class Stopwatch:
         str
             A string showing the constructor parameters, following the
             Python convention that repr() should return a string that
-            could be used to recreate the object.
+            could be used to recreate the object, given an appropriate
+            environment where the referenced callables are imported.
         """
-        timer_name = getattr(
-            self._timer_func,
-            "__name__",
-            repr(self._timer_func),
-        )
+
+        def _callable_name(func: Callable[..., object]) -> str:
+            module = getattr(func, "__module__", None)
+            qualname = getattr(func, "__qualname__", None)
+            name = (
+                qualname
+                if isinstance(qualname, str)
+                else getattr(func, "__name__", None)
+            )
+            if not isinstance(name, str):
+                return repr(func)
+            if isinstance(module, str):
+                return f"{module}.{name}"
+            return name
+
+        timer_name = _callable_name(self._timer_func)
         callback_name = (
             None
             if self._exit_callback is None
-            else getattr(
-                self._exit_callback,
-                "__name__",
-                repr(self._exit_callback),
-            )
+            else _callable_name(self._exit_callback)
         )
         return (
             f"Stopwatch(timer_func={timer_name}, exit_callback={callback_name})"

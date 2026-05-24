@@ -214,11 +214,19 @@ class TestStopwatchRepr:
         """Test __repr__ with exit callback."""
         callback = Mock()
         callback.__name__ = "test_callback"
+        callback.__qualname__ = "test_callback"
+        callback.__module__ = "test_module"
         sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
         repr_str = repr(sw)
         assert "Stopwatch" in repr_str
         assert "timer_func=" in repr_str
-        assert "exit_callback=test_callback" in repr_str
+        assert "exit_callback=test_module.test_callback" in repr_str
+
+    def test_repr_uses_fully_qualified_name(self) -> None:
+        """Test __repr__ outputs fully qualified callable names."""
+        sw = Stopwatch()
+        repr_str = repr(sw)
+        assert "timer_func=time.perf_counter" in repr_str
 
     def test_repr_without_callback(self, mock_timer: Mock) -> None:
         """Test __repr__ without exit callback."""
