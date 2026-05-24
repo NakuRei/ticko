@@ -7,8 +7,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from ticko._stopwatch import Stopwatch
 from ticko.decorators import stopwatch
-from ticko.stopwatch import Stopwatch
 
 
 @pytest.fixture

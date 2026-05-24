@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from ticko.stopwatch import (
+from ticko._stopwatch import (
     AlreadyRunningError,
     NoLapsRecordedError,
     NotRunningError,
@@ -267,7 +267,7 @@ class TestStopwatchName:
     ) -> None:
         """Test log message includes name on start."""
         sw = Stopwatch(name="timer_a", timer_func=mock_timer)
-        with caplog.at_level(logging.DEBUG, logger="ticko.stopwatch"):
+        with caplog.at_level(logging.DEBUG, logger="ticko._stopwatch"):
             sw.start()
         assert "timer_a" in caplog.text
 
@@ -277,7 +277,7 @@ class TestStopwatchName:
         """Test log message includes name on stop."""
         sw = Stopwatch(name="timer_b", timer_func=mock_timer)
         sw.start()
-        with caplog.at_level(logging.DEBUG, logger="ticko.stopwatch"):
+        with caplog.at_level(logging.DEBUG, logger="ticko._stopwatch"):
             sw.stop()
         assert "timer_b" in caplog.text
 

@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable
 from typing import ParamSpec, TypeVar, overload
 
-from .stopwatch import Stopwatch
+from ._stopwatch import Stopwatch
 
 P = ParamSpec("P")
 R = TypeVar("R")

@@ -57,8 +57,7 @@ Using Stopwatch as a context manager:
 
 """
 
-from .decorators import stopwatch
-from .stopwatch import (
+from ._stopwatch import (
     AlreadyRunningError,
     NoLapsRecordedError,
     NotRunningError,
@@ -66,6 +65,7 @@ from .stopwatch import (
     Stopwatch,
     StopwatchError,
 )
+from .decorators import stopwatch
 
 __all__ = [
     "AlreadyRunningError",
