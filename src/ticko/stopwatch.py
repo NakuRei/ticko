@@ -1,5 +1,6 @@
 """Thread-safe stopwatch for measuring elapsed time."""
 
+import contextlib
 import logging
 import threading
 import time
@@ -337,5 +338,5 @@ class Stopwatch:
         If the stopwatch was already stopped before the context exits,
         this method does nothing to avoid raising NotRunningError.
         """
-        if self.is_running:
+        with contextlib.suppress(NotRunningError):
             self.stop()
