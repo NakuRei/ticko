@@ -199,6 +199,16 @@ class TestStopwatchCallbacks:
         sw.stop()
         callback.assert_called_once_with(1.0)
 
+    def test_exit_callback_not_called_on_reset_while_running(
+        self, mock_timer: Mock
+    ) -> None:
+        """Test exit callback is not called on reset() while running."""
+        callback = Mock()
+        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+        sw.start()
+        sw.reset()
+        callback.assert_not_called()
+
     def test_exit_callback_with_exception(self, mock_timer: Mock) -> None:
         """Test exit callback that raises exception is handled."""
         callback = Mock(side_effect=RuntimeError("Callback error"))
