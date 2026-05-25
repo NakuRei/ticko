@@ -200,7 +200,14 @@ class Stopwatch:
             raise AssertionError(msg)
 
     def reset(self) -> None:
-        """Reset the stopwatch to its initial state."""
+        """Reset the stopwatch to its initial state.
+
+        Clears all timing state regardless of whether the stopwatch is
+        currently running. If called while running, the stopwatch is stopped
+        without invoking ``exit_callback``; the in-progress measurement is
+        discarded. To stop and trigger the callback before resetting, call
+        ``stop()`` first.
+        """
         with self._lock:
             self._time_start = None
             self._time_last_lap_start = None
