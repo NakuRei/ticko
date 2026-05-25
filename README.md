@@ -73,8 +73,8 @@ elapsed = sw.stop()
 ### Custom Callbacks
 
 ```python
-def log_time(sw: Stopwatch):
-    logger.info(f"Execution took {sw.time_elapsed:.3f}s")
+def log_time(elapsed: float) -> None:
+    logger.info(f"Execution took {elapsed:.3f}s")
 
 @stopwatch(exit_callback=log_time)
 def my_function():
