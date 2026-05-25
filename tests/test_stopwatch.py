@@ -197,7 +197,7 @@ class TestStopwatchCallbacks:
         sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
         sw.start()
         sw.stop()
-        callback.assert_called_once_with(sw)
+        callback.assert_called_once_with(1.0)
 
     def test_exit_callback_with_exception(self, mock_timer: Mock) -> None:
         """Test exit callback that raises exception is handled."""

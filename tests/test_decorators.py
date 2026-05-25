@@ -7,7 +7,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from ticko._stopwatch import Stopwatch
 from ticko.decorators import stopwatch
 
 
@@ -32,8 +31,7 @@ class TestStopwatchDecorator:
 
         assert result == 10
         callback.assert_called_once()
-        sw_arg = callback.call_args[0][0]
-        assert sw_arg.time_elapsed == 1.0
+        assert callback.call_args[0][0] == 1.0
 
     def test_decorator_without_parentheses(self) -> None:
         """Test decorator used without parentheses."""
@@ -62,14 +60,12 @@ class TestStopwatchDecorator:
         result = sample_func(3, 4)
         assert result == 7
         callback.assert_called_once()
-        sw_arg = callback.call_args[0][0]
-        assert isinstance(sw_arg, Stopwatch)
-        assert sw_arg.time_elapsed == 1.0
+        assert callback.call_args[0][0] == 1.0
 
     def test_decorator_preserves_function_metadata(self) -> None:
         """Test decorator preserves function name and docstring."""
 
-        @stopwatch(exit_callback=lambda sw: None)
+        @stopwatch(exit_callback=lambda elapsed: None)
         def documented_func(x: int) -> int:
             """This is a documented function."""
             return x
@@ -90,8 +86,7 @@ class TestStopwatchDecorator:
 
         # Callback should still be called
         callback.assert_called_once()
-        sw_arg = callback.call_args[0][0]
-        assert not sw_arg.is_running
+        assert isinstance(callback.call_args[0][0], float)
 
     def test_decorator_with_args_and_kwargs(self) -> None:
         """Test decorator with various argument types."""
@@ -117,8 +112,7 @@ class TestStopwatchDecorator:
         result = sample_func()
         assert result == "done"
         callback.assert_called_once()
-        sw_arg = callback.call_args[0][0]
-        assert sw_arg.time_elapsed == 100.0
+        assert callback.call_args[0][0] == 100.0
 
     def test_default_callback_format(self, mock_timer: Mock) -> None:
         """Test the default callback output format."""
@@ -147,8 +141,8 @@ class TestStopwatchDecoratorRealTime:
         """Test decorator with actual time delays."""
         times: list[float] = []
 
-        def capture_callback(sw: Stopwatch) -> None:
-            times.append(sw.time_elapsed)
+        def capture_callback(elapsed: float) -> None:
+            times.append(elapsed)
 
         @stopwatch(exit_callback=capture_callback)
         def delayed_func() -> str:

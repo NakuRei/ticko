@@ -211,9 +211,9 @@ class TestThreadSafety:
         callback_calls: list[float] = []
         lock = threading.Lock()
 
-        def thread_safe_callback(sw: Stopwatch) -> None:
+        def thread_safe_callback(elapsed: float) -> None:
             with lock:
-                callback_calls.append(sw.time_elapsed)
+                callback_calls.append(elapsed)
 
         def run_stopwatch() -> None:
             sw = Stopwatch(exit_callback=thread_safe_callback)

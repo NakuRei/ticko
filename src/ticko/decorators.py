@@ -24,7 +24,7 @@ def stopwatch(
     func: None = None,
     *,
     timer_func: Callable[[], float] = time.perf_counter,
-    exit_callback: Callable[[Stopwatch], None] | None = None,
+    exit_callback: Callable[[float], None] | None = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 
 
@@ -33,7 +33,7 @@ def stopwatch(
     func: Callable[P, R] | None = None,
     *,
     timer_func: Callable[[], float] = time.perf_counter,
-    exit_callback: Callable[[Stopwatch], None] | None = None,
+    exit_callback: Callable[[float], None] | None = None,
 ) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
     """Measure the execution time of a function using Stopwatch.
 
@@ -43,8 +43,8 @@ def stopwatch(
         The function to decorate. If None, returns a decorator function.
     timer_func : Callable[[], float], optional
         Function returning the current time (default: time.perf_counter).
-    exit_callback : Callable[[Stopwatch], None] | None, optional
-        Optional callback invoked with the Stopwatch instance when the
+    exit_callback : Callable[[float], None] | None, optional
+        Optional callback invoked with the elapsed time when the
         decorated function exits. If None, a default callback is used that
         prints the elapsed time to standard output.
 
@@ -72,13 +72,13 @@ def stopwatch(
         """Create the wrapper function for the given function."""
         if exit_callback is None:
 
-            def _default_callback(sw: Stopwatch) -> None:
+            def _default_callback(elapsed: float) -> None:
                 print(  # noqa: T201
                     f"Function {f.__name__!r} executed "
-                    f"in {sw.time_elapsed:.6f} seconds",
+                    f"in {elapsed:.6f} seconds",
                 )
 
-            callback: Callable[[Stopwatch], None] = _default_callback
+            callback: Callable[[float], None] = _default_callback
         else:
             callback = exit_callback
 

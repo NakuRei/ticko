@@ -46,8 +46,8 @@ class Stopwatch:
         string representations (default: None).
     timer_func : Callable[[], float], optional
         Function returning the current time (default: time.perf_counter).
-    exit_callback : Callable[[Stopwatch], None] | None, optional
-        Optional callback invoked with the Stopwatch instance when the
+    exit_callback : Callable[[float], None] | None, optional
+        Optional callback invoked with the elapsed time when the
         stopwatch is stopped. If None, no callback is invoked.
 
     Attributes
@@ -103,7 +103,7 @@ class Stopwatch:
         *,
         name: str | None = None,
         timer_func: Callable[[], float] = time.perf_counter,
-        exit_callback: Callable[["Stopwatch"], None] | None = None,
+        exit_callback: Callable[[float], None] | None = None,
     ) -> None:
         """Initialize the stopwatch.
 
@@ -114,8 +114,9 @@ class Stopwatch:
             string representations (default: None).
         timer_func : Callable[[], float], optional
             Function returning the current time (default: time.perf_counter).
-        exit_callback : Callable[[Stopwatch], None] | None, optional
-            Optional callback invoked when the stopwatch is stopped.
+        exit_callback : Callable[[float], None] | None, optional
+            Optional callback invoked with the elapsed time when the stopwatch
+            is stopped.
 
         """
         self._name: Final = name
@@ -275,11 +276,11 @@ class Stopwatch:
                 time_elapsed,
             )
 
-        # Call exit_callback outside the lock to avoid deadlock
-        # if callback tries to access stopwatch properties
+        # Call exit_callback outside the lock to avoid holding the lock
+        # during potentially slow callback execution
         if self._exit_callback is not None:
             try:
-                self._exit_callback(self)
+                self._exit_callback(time_elapsed)
             except Exception:
                 logger.exception("Exit callback raised an exception")
 
