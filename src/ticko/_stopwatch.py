@@ -64,8 +64,9 @@ class Stopwatch:
         The start time of the last lap, or None if no laps recorded.
     time_elapsed : float
         The total elapsed time since the stopwatch was started.
-    time_last_lap : float
-        The elapsed time of the last lap.
+    time_since_last_lap : float
+        Elapsed time from the last ``lap()`` marker to now (if running) or to
+        the stop time (if stopped).
 
     Methods
     -------
@@ -182,8 +183,8 @@ class Stopwatch:
             raise AssertionError(msg)
 
     @property
-    def time_last_lap(self) -> float:
-        """Get the elapsed time of the last lap."""
+    def time_since_last_lap(self) -> float:
+        """Get the elapsed time from the last lap marker to now or to stop."""
         with self._lock:
             if not self._lap_recorded or self._time_last_lap_start is None:
                 msg = (

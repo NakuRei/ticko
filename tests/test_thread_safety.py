@@ -255,7 +255,7 @@ class TestRaceConditions:
 
         for _ in range(50):
             sw.lap()
-            last_lap_property = sw.time_last_lap
+            last_lap_property = sw.time_since_last_lap
             # The property should be very close to 0 right after lap
             assert last_lap_property < 0.01
 

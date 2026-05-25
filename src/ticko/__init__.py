@@ -18,7 +18,7 @@ NotRunningError
 NotStartedError
     Raised when accessing time_elapsed before start() has ever been called.
 NoLapsRecordedError
-    Raised when accessing time_last_lap before any lap has been recorded.
+    Raised when accessing time_since_last_lap before any lap has been recorded.
 
 Functions
 ---------

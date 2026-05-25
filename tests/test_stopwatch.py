@@ -126,44 +126,46 @@ class TestStopwatchProperties:
         with pytest.raises(NotStartedError, match="not been started"):
             _ = stopwatch.time_elapsed
 
-    def test_time_last_lap_while_running(self, stopwatch: Stopwatch) -> None:
-        """Test getting last lap time while running."""
+    def test_time_since_last_lap_while_running(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test getting elapsed time since last lap while running."""
         stopwatch.start()  # time = 0.0
         stopwatch.lap()  # time = 1.0
-        last_lap = stopwatch.time_last_lap  # time = 2.0
+        last_lap = stopwatch.time_since_last_lap  # time = 2.0
         assert last_lap == 1.0
 
-    def test_time_last_lap_after_stop(self, stopwatch: Stopwatch) -> None:
-        """Test getting last lap time after stopping."""
+    def test_time_since_last_lap_after_stop(self, stopwatch: Stopwatch) -> None:
+        """Test getting elapsed time since last lap after stopping."""
         stopwatch.start()  # time = 0.0
         stopwatch.lap()  # time = 1.0
         stopwatch.stop()  # time = 2.0
-        last_lap = stopwatch.time_last_lap  # Should not call timer
+        last_lap = stopwatch.time_since_last_lap  # Should not call timer
         assert last_lap == 1.0
 
-    def test_time_last_lap_no_laps(self, stopwatch: Stopwatch) -> None:
-        """Test getting last lap time with no laps raises error."""
+    def test_time_since_last_lap_no_laps(self, stopwatch: Stopwatch) -> None:
+        """Test no laps raises error."""
         with pytest.raises(NoLapsRecordedError, match="No laps"):
-            _ = stopwatch.time_last_lap
+            _ = stopwatch.time_since_last_lap
 
-    def test_time_last_lap_no_laps_after_start(
+    def test_time_since_last_lap_no_laps_after_start(
         self, stopwatch: Stopwatch
     ) -> None:
-        """Test time_last_lap before any lap() raises error."""
+        """Test time_since_last_lap before any lap() raises error."""
         stopwatch.start()
         with pytest.raises(NoLapsRecordedError, match="No laps"):
-            _ = stopwatch.time_last_lap
+            _ = stopwatch.time_since_last_lap
 
-    def test_time_last_lap_no_laps_after_restart(
+    def test_time_since_last_lap_no_laps_after_restart(
         self, stopwatch: Stopwatch
     ) -> None:
-        """Test time_last_lap after stop() → start() without lap() raises."""
+        """Test raises after stop() -> start() without lap()."""
         stopwatch.start()
         stopwatch.lap()
         stopwatch.stop()
         stopwatch.start()
         with pytest.raises(NoLapsRecordedError, match="No laps"):
-            _ = stopwatch.time_last_lap
+            _ = stopwatch.time_since_last_lap
 
 
 class TestStopwatchContextManager:
