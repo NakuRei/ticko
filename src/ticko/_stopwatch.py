@@ -28,7 +28,7 @@ class NotStartedError(StopwatchError):
 
 
 class NoLapsRecordedError(StopwatchError):
-    """Raised when accessing time_last_lap before any lap has been recorded."""
+    """Raised when accessing time_since_last_lap before any lap is recorded."""
 
 
 @final
