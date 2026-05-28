@@ -102,8 +102,14 @@ For more examples, see the [`examples/`](examples/) directory.
 
 ### `Stopwatch`
 
+**Constructor:**
+- `Stopwatch(*, name=None, timer_func=time.perf_counter, exit_callback=None)` - Create a stopwatch with optional naming, custom timing, and stop callback
+
 **Properties:**
+- `name: str | None` - Optional stopwatch name
 - `is_running: bool` - Current state
+- `time_start: float | None` - Raw timer value recorded at start
+- `time_stop: float | None` - Raw timer value recorded at stop
 - `time_elapsed: float` - Total elapsed time
 - `time_since_last_lap: float` - Elapsed time since the last lap marker
 
