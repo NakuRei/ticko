@@ -18,7 +18,17 @@ def stopwatch(
 ) -> Callable[P, R]: ...
 
 
-# Overload 2: Decorator with arguments (@stopwatch(...))
+# Overload 2: Direct decoration with arguments (stopwatch(func, ...))
+@overload
+def stopwatch(
+    func: Callable[P, R],
+    *,
+    timer_func: Callable[[], float] = time.perf_counter,
+    exit_callback: Callable[[float], None] | None = None,
+) -> Callable[P, R]: ...
+
+
+# Overload 3: Decorator with arguments (@stopwatch(...))
 @overload
 def stopwatch(
     func: None = None,

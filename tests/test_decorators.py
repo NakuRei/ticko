@@ -62,6 +62,28 @@ class TestStopwatchDecorator:
         callback.assert_called_once()
         assert callback.call_args[0][0] == 1.0
 
+    def test_direct_decoration_with_custom_options(
+        self,
+        mock_timer: Mock,
+    ) -> None:
+        """Test direct decoration with custom timer and callback."""
+        callback = Mock()
+
+        def sample_func(x: int) -> int:
+            return x * 2
+
+        decorated = stopwatch(
+            sample_func,
+            timer_func=mock_timer,
+            exit_callback=callback,
+        )
+
+        result: int = decorated(5)
+
+        assert result == 10
+        callback.assert_called_once()
+        assert callback.call_args[0][0] == 1.0
+
     def test_decorator_preserves_function_metadata(self) -> None:
         """Test decorator preserves function name and docstring."""
 
