@@ -29,28 +29,28 @@ Examples
 --------
 Using the decorator:
 
->>> @stopwatch
+>>> timer_values = iter([0.0, 0.25])
+>>> @stopwatch(timer_func=timer_values.__next__)
 ... def compute(n):
 ...     return sum(range(n))
 >>> compute(1000)
-Function 'compute' executed in 0.000123 seconds
+Function 'compute' exited after 0.250000 seconds
 499500
 
 Using the Stopwatch class directly:
 
->>> sw = Stopwatch()
+>>> timer_values = iter([0.0, 1.0, 3.0])
+>>> sw = Stopwatch(timer_func=timer_values.__next__)
 >>> sw.start()
->>> # ... do some work ...
 >>> sw.lap()
-1.234
->>> # ... do more work ...
+1.0
 >>> sw.stop()
-2.567
+3.0
 
 Using Stopwatch as a context manager:
 
->>> with Stopwatch() as sw:
-...     # ... do some work ...
+>>> timer_values = iter([0.0, 1.234])
+>>> with Stopwatch(timer_func=timer_values.__next__) as sw:
 ...     pass
 >>> sw.time_elapsed
 1.234

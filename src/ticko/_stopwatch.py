@@ -83,21 +83,20 @@ class Stopwatch:
 
     Examples
     --------
-    >>> sw = Stopwatch()
+    >>> timer_values = iter([0.0, 1.0, 3.0])
+    >>> sw = Stopwatch(timer_func=timer_values.__next__)
     >>> sw.start()
-    >>> time.sleep(1)
     >>> sw.lap()
     1.0
-    >>> time.sleep(2)
     >>> sw.stop()
     3.0
     >>> sw.time_elapsed
     3.0
     >>> sw.reset()
-    >>> sw.time_elapsed
+    >>> sw.time_elapsed  # doctest: +ELLIPSIS
     Traceback (most recent call last):
         ...
-    NotStartedError: ...
+    ticko._stopwatch.NotStartedError: ...
 
     """
 
