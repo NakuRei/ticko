@@ -57,11 +57,13 @@ class Stopwatch:
     is_running : bool
         Indicates whether the stopwatch is currently running.
     time_start : float | None
-        The start time of the stopwatch, or None if not started.
+        The raw ``timer_func()`` value recorded at ``start()``, or None if not
+        started. Its absolute value depends on the ``timer_func`` used (e.g.
+        a Unix timestamp when using ``time.time``, an arbitrary epoch when
+        using the default ``time.perf_counter``).
     time_stop : float | None
-        The stop time of the stopwatch, or None if not stopped.
-    time_last_lap_start : float | None
-        The start time of the last lap, or None if no laps recorded.
+        The raw ``timer_func()`` value recorded at ``stop()``, or None if not
+        stopped. Same caveat as ``time_start`` regarding absolute value.
     time_elapsed : float
         The total elapsed time since the stopwatch was started.
     time_since_last_lap : float
@@ -148,13 +150,23 @@ class Stopwatch:
 
     @property
     def time_start(self) -> float | None:
-        """Get the start time of the stopwatch."""
+        """Get the raw timer_func() value recorded at start().
+
+        Returns None if the stopwatch has not been started. The absolute value
+        depends on the timer_func used; compare only against other timestamps
+        from the same stopwatch instance.
+        """
         with self._lock:
             return self._time_start
 
     @property
     def time_stop(self) -> float | None:
-        """Get the stop time of the stopwatch."""
+        """Get the raw timer_func() value recorded at stop().
+
+        Returns None if the stopwatch has not been stopped. The absolute value
+        depends on the timer_func used; compare only against other timestamps
+        from the same stopwatch instance.
+        """
         with self._lock:
             return self._time_stop
 
