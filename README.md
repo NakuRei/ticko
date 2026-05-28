@@ -105,7 +105,7 @@ For more examples, see the [`examples/`](examples/) directory.
 **Properties:**
 - `is_running: bool` - Current state
 - `time_elapsed: float` - Total elapsed time
-- `time_last_lap: float` - Last lap duration
+- `time_since_last_lap: float` - Elapsed time since the last lap marker
 
 **Methods:**
 - `start()` - Start timing
