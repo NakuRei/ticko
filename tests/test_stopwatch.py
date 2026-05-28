@@ -35,14 +35,12 @@ class TestStopwatchBasicOperations:
         assert not stopwatch.is_running
         assert stopwatch.time_start is None
         assert stopwatch.time_stop is None
-        assert stopwatch.time_last_lap_start is None
 
     def test_start(self, stopwatch: Stopwatch) -> None:
         """Test starting the stopwatch."""
         stopwatch.start()
         assert stopwatch.is_running
         assert stopwatch.time_start == 0.0
-        assert stopwatch.time_last_lap_start == 0.0
         assert stopwatch.time_stop is None
 
     def test_start_already_running(self, stopwatch: Stopwatch) -> None:
@@ -74,7 +72,6 @@ class TestStopwatchBasicOperations:
         assert not stopwatch.is_running
         assert stopwatch.time_start is None
         assert stopwatch.time_stop is None
-        assert stopwatch.time_last_lap_start is None
 
     def test_reset_and_restart(self, stopwatch: Stopwatch) -> None:
         """Test resetting and restarting the stopwatch."""
@@ -93,11 +90,9 @@ class TestStopwatchLapFunctionality:
         stopwatch.start()  # time = 0.0
         lap1 = stopwatch.lap()  # time = 1.0
         assert lap1 == 1.0
-        assert stopwatch.time_last_lap_start == 1.0
 
         lap2 = stopwatch.lap()  # time = 2.0
         assert lap2 == 1.0
-        assert stopwatch.time_last_lap_start == 2.0
 
     def test_lap_not_started(self, stopwatch: Stopwatch) -> None:
         """Test recording lap on non-running stopwatch raises error."""

@@ -159,12 +159,6 @@ class Stopwatch:
             return self._time_stop
 
     @property
-    def time_last_lap_start(self) -> float | None:
-        """Get the start time of the last lap."""
-        with self._lock:
-            return self._time_last_lap_start
-
-    @property
     def time_elapsed(self) -> float:
         """Get the total elapsed time."""
         with self._lock:
