@@ -74,8 +74,8 @@ def stopwatch(
 
             def _default_callback(elapsed: float) -> None:
                 print(  # noqa: T201
-                    f"Function {f.__name__!r} executed "
-                    f"in {elapsed:.6f} seconds",
+                    f"Function {f.__name__!r} exited "
+                    f"after {elapsed:.6f} seconds",
                 )
 
             callback: Callable[[float], None] = _default_callback

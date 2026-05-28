@@ -126,12 +126,34 @@ class TestStopwatchDecorator:
             my_function()
 
         output = f.getvalue()
-        # Check for proper formatting (the bug we fixed)
         assert "'my_function'" in output
+        assert "exited after" in output
         assert "1.000000" in output
-        # Should NOT contain the format string
         assert "%r" not in output
         assert "%f" not in output
+
+    def test_default_callback_format_with_exception(
+        self,
+        mock_timer: Mock,
+    ) -> None:
+        """Test the default callback output when the function raises."""
+
+        @stopwatch(timer_func=mock_timer)
+        def failing_function() -> None:
+            raise ValueError("Test error")
+
+        f = io.StringIO()
+        with (
+            redirect_stdout(f),
+            pytest.raises(ValueError, match="Test error"),
+        ):
+            failing_function()
+
+        output = f.getvalue()
+        assert "'failing_function'" in output
+        assert "exited after" in output
+        assert "1.000000" in output
+        assert "executed" not in output
 
 
 class TestStopwatchDecoratorRealTime:
