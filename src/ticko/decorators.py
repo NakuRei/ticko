@@ -1,9 +1,10 @@
 """Decorator for measuring function execution time."""
 
 import functools
+import inspect
 import time
-from collections.abc import Callable
-from typing import ParamSpec, TypeVar, overload
+from collections.abc import Awaitable, Callable
+from typing import ParamSpec, TypeVar, cast, overload
 
 from ._stopwatch import Stopwatch
 
@@ -70,6 +71,11 @@ def stopwatch(
     re-raised after the stopwatch has been stopped; exit_callback is still
     invoked.
 
+    When applied to an async function, timing includes the awaited function
+    body until it returns or raises. When applied to a synchronous function
+    that returns an awaitable object, timing ends when that object is returned.
+    Generator and async generator consumption time is not measured.
+
     Examples
     --------
     >>> @stopwatch
@@ -91,6 +97,23 @@ def stopwatch(
             callback: Callable[[float], None] = _default_callback
         else:
             callback = exit_callback
+
+        if inspect.iscoroutinefunction(f):
+            async_func = cast("Callable[P, Awaitable[object]]", f)
+
+            @functools.wraps(f)
+            async def async_wrapper(
+                *args: P.args,
+                **kwargs: P.kwargs,
+            ) -> object:
+                sw = Stopwatch(timer_func=timer_func, exit_callback=callback)
+                sw.start()
+                try:
+                    return await async_func(*args, **kwargs)
+                finally:
+                    sw.stop()
+
+            return cast("Callable[P, R]", async_wrapper)
 
         @functools.wraps(f)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
