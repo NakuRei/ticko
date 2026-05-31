@@ -216,6 +216,19 @@ class TestLapElapsedTime:
         last_lap = stopwatch.time_since_last_lap  # time = 2.0
         assert last_lap == 1.0
 
+    def test_time_since_last_lap_while_running_uses_most_recent_lap(
+        self,
+    ) -> None:
+        """Test running elapsed time uses the most recent lap."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0, 8.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.lap()
+        stopwatch.lap()
+
+        assert stopwatch.time_since_last_lap == 5.0
+
     def test_time_since_last_lap_after_stop(self, stopwatch: Stopwatch) -> None:
         """Test getting elapsed time since last lap after stopping."""
         stopwatch.start()  # time = 0.0
@@ -223,6 +236,21 @@ class TestLapElapsedTime:
         stopwatch.stop()  # time = 2.0
         last_lap = stopwatch.time_since_last_lap  # Should not call timer
         assert last_lap == 1.0
+
+    def test_time_since_last_lap_after_stop_uses_most_recent_lap(
+        self,
+    ) -> None:
+        """Test stopped elapsed time uses the most recent lap."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0, 10.0, 20.0, 30.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.lap()
+        stopwatch.lap()
+        stopwatch.stop()
+
+        assert stopwatch.time_since_last_lap == 7.0
+        assert stopwatch.time_since_last_lap == 7.0
 
     def test_time_since_last_lap_no_laps(self, stopwatch: Stopwatch) -> None:
         """Test no laps raises error."""
@@ -234,6 +262,16 @@ class TestLapElapsedTime:
     ) -> None:
         """Test time_since_last_lap before any lap() raises error."""
         stopwatch.start()
+        with pytest.raises(NoLapsRecordedError):
+            _ = stopwatch.time_since_last_lap
+
+    def test_time_since_last_lap_no_laps_after_stop(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test stop() without lap() keeps time_since_last_lap unavailable."""
+        stopwatch.start()
+        stopwatch.stop()
+
         with pytest.raises(NoLapsRecordedError):
             _ = stopwatch.time_since_last_lap
 
