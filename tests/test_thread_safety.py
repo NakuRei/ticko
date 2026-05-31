@@ -4,7 +4,7 @@ import threading
 import time
 from typing import Any
 
-from ticko._stopwatch import (
+from ticko import (
     AlreadyRunningError,
     NotRunningError,
     NotStartedError,
