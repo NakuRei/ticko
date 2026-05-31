@@ -81,13 +81,25 @@ class TestLifecycleOperations:
         assert stopwatch.time_start is None
         assert stopwatch.time_stop is None
 
-    def test_reset_and_restart(self, stopwatch: Stopwatch) -> None:
-        """Test resetting and restarting the stopwatch."""
+    def test_start_after_reset(self, stopwatch: Stopwatch) -> None:
+        """Test start() after reset()."""
         stopwatch.start()  # time = 0.0
         stopwatch.stop()  # time = 1.0
         stopwatch.reset()
         stopwatch.start()  # time = 2.0
         assert stopwatch.is_running
+
+    def test_start_after_stop_starts_new_session(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test stop() -> start() begins a new measurement session."""
+        stopwatch.start()  # time = 0.0
+        stopwatch.stop()  # time = 1.0
+        stopwatch.start()  # time = 2.0
+
+        assert stopwatch.is_running
+        assert stopwatch.time_start == 2.0
+        assert stopwatch.time_stop is None
 
 
 class TestInvalidLifecycleOperations:
@@ -156,6 +168,19 @@ class TestLapOperations:
         with pytest.raises(NotRunningError):
             stopwatch.lap()
 
+    def test_first_lap_after_restart_is_measured_from_restart(self) -> None:
+        """Test first lap after restart uses the restart time."""
+        timer = Mock(side_effect=[0.0, 1.0, 2.0, 3.0, 4.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.stop()  # time = 2.0
+        stopwatch.start()  # time = 3.0
+        lap_after_restart = stopwatch.lap()  # time = 4.0
+
+        assert lap_after_restart == 1.0
+
 
 class TestElapsedTime:
     """Test total elapsed time property access."""
@@ -212,10 +237,10 @@ class TestLapElapsedTime:
         with pytest.raises(NoLapsRecordedError):
             _ = stopwatch.time_since_last_lap
 
-    def test_time_since_last_lap_no_laps_after_restart(
+    def test_start_after_stop_clears_lap_session_state(
         self, stopwatch: Stopwatch
     ) -> None:
-        """Test raises after stop() -> start() without lap()."""
+        """Test stop() -> start() clears lap state for the new session."""
         stopwatch.start()
         stopwatch.lap()
         stopwatch.stop()
