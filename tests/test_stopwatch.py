@@ -125,8 +125,34 @@ class TestLapOperations:
         lap2 = stopwatch.lap()  # time = 2.0
         assert lap2 == 1.0
 
+    def test_lap_keeps_total_elapsed_time_running(self) -> None:
+        """Test lap() returns interval times without resetting total elapsed."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0, 5.0, 8.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        lap1 = stopwatch.lap()  # time = 1.0
+        lap2 = stopwatch.lap()  # time = 3.0
+        elapsed = stopwatch.time_elapsed  # time = 5.0
+        stopped = stopwatch.stop()  # time = 8.0
+
+        assert lap1 == 1.0
+        assert lap2 == 2.0
+        assert elapsed == 5.0
+        assert stopped == 8.0
+
     def test_lap_not_started(self, stopwatch: Stopwatch) -> None:
         """Test recording lap on non-running stopwatch raises error."""
+        with pytest.raises(NotRunningError):
+            stopwatch.lap()
+
+    def test_lap_after_stop_raises_not_running(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test recording lap after stop() raises NotRunningError."""
+        stopwatch.start()
+        stopwatch.stop()
+
         with pytest.raises(NotRunningError):
             stopwatch.lap()
 
