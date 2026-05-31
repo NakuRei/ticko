@@ -246,6 +246,34 @@ class TestStopwatchDecoratorAsyncFunction:
         assert result == 10
         assert events == ["body-start", "body-end", "callback:1.0"]
 
+    def test_async_callable_object_callback_runs_after_awaited_body(
+        self,
+    ) -> None:
+        """Test callback runs after an async callable object completes."""
+        events: list[str] = []
+
+        def capture_callback(elapsed: float) -> None:
+            events.append(f"callback:{elapsed}")
+
+        class AsyncWork:
+            async def __call__(self, value: int) -> int:
+                events.append("body-start")
+                await asyncio.sleep(0)
+                events.append("body-end")
+                return value * 2
+
+        timer = Mock(side_effect=[0.0, 1.0])
+        decorated = stopwatch(
+            AsyncWork(),
+            timer_func=timer,
+            exit_callback=capture_callback,
+        )
+
+        result = asyncio.run(decorated(5))
+
+        assert result == 10
+        assert events == ["body-start", "body-end", "callback:1.0"]
+
     def test_async_function_measures_awaited_execution_time(self) -> None:
         """Test async function timing includes awaited work."""
         times: list[float] = []

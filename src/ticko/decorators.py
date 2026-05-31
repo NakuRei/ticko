@@ -103,7 +103,9 @@ def stopwatch(
         else:
             callback = exit_callback
 
-        if inspect.iscoroutinefunction(f):
+        if inspect.iscoroutinefunction(f) or inspect.iscoroutinefunction(
+            type(f).__call__,
+        ):
             async_func = cast("Callable[P, Awaitable[object]]", f)
 
             @functools.wraps(f)
