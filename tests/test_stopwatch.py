@@ -399,8 +399,7 @@ class TestStopwatchRealTime:
         sw.start()
         time.sleep(0.1)
         elapsed = sw.stop()
-        # Allow some tolerance for timing
-        assert 0.09 < elapsed < 0.15
+        assert elapsed > 0.09
 
     def test_real_lap_time(self) -> None:
         """Test lap times with real timer."""

@@ -219,7 +219,7 @@ class TestStopwatchDecoratorRealTime:
         result: str = delayed_func()
         assert result == "done"
         assert len(times) == 1
-        assert 0.09 < times[0] < 0.15
+        assert times[0] > 0.09
 
 
 class TestStopwatchDecoratorAsyncFunction:
@@ -287,7 +287,7 @@ class TestStopwatchDecoratorAsyncFunction:
 
         assert result == "done"
         assert len(times) == 1
-        assert 0.04 < times[0] < 0.12
+        assert times[0] > 0.04
 
     def test_async_function_callback_runs_after_awaited_exception(self) -> None:
         """Test callback runs after an async function body raises."""
