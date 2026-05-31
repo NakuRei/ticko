@@ -28,6 +28,15 @@ def stopwatch(mock_timer: Mock) -> Stopwatch:
     return Stopwatch(timer_func=mock_timer)
 
 
+def repr_contract_timer() -> float:
+    """Return a stable timer value for repr contract tests."""
+    return 0.0
+
+
+def repr_contract_callback(_elapsed: float) -> None:
+    """Accept elapsed time for repr contract tests."""
+
+
 class TestLifecycleOperations:
     """Test Stopwatch lifecycle state changes."""
 
@@ -301,61 +310,68 @@ class TestNameOption:
 
 
 class TestRepr:
-    """Test Stopwatch string representation."""
+    """Test Stopwatch constructor-style representation contract."""
 
-    def test_repr_with_default_timer(self, stopwatch: Stopwatch) -> None:
-        """Test __repr__ shows constructor parameters."""
-        repr_str = repr(stopwatch)
-        assert "Stopwatch" in repr_str
-        assert "timer_func=" in repr_str
-        assert "exit_callback=" in repr_str
+    def test_repr_returns_default_constructor_form(self) -> None:
+        """Test default __repr__ uses the public constructor form."""
+        assert repr(Stopwatch()) == (
+            "Stopwatch(timer_func=time.perf_counter, exit_callback=None)"
+        )
 
-    def test_repr_includes_name(self, mock_timer: Mock) -> None:
-        """Test __repr__ includes name when set."""
-        sw = Stopwatch(name="db", timer_func=mock_timer)
-        assert "name='db'" in repr(sw)
+    def test_repr_includes_name_argument_when_set(self) -> None:
+        """Test __repr__ includes name as a constructor argument."""
+        sw = Stopwatch(name="db", timer_func=repr_contract_timer)
+        assert repr(sw) == (
+            "Stopwatch("
+            f"name='db', timer_func={__name__}.repr_contract_timer, "
+            "exit_callback=None)"
+        )
 
-    def test_repr_omits_name_when_none(self, stopwatch: Stopwatch) -> None:
-        """Test __repr__ omits name when not set."""
-        assert "name=" not in repr(stopwatch)
+    def test_repr_omits_name_argument_when_none(self) -> None:
+        """Test __repr__ omits the name argument when name is None."""
+        sw = Stopwatch(timer_func=repr_contract_timer)
+        assert repr(sw) == (
+            "Stopwatch("
+            f"timer_func={__name__}.repr_contract_timer, "
+            "exit_callback=None)"
+        )
 
-    def test_repr_with_callback(self, mock_timer: Mock) -> None:
-        """Test __repr__ with exit callback."""
-        callback = Mock()
-        callback.__name__ = "test_callback"
-        callback.__qualname__ = "test_callback"
-        callback.__module__ = "test_module"
-        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
-        repr_str = repr(sw)
-        assert "Stopwatch" in repr_str
-        assert "timer_func=" in repr_str
-        assert "exit_callback=test_module.test_callback" in repr_str
+    def test_repr_includes_qualified_callback_name(self) -> None:
+        """Test __repr__ includes callback as a qualified callable name."""
+        sw = Stopwatch(
+            timer_func=repr_contract_timer,
+            exit_callback=repr_contract_callback,
+        )
+        assert repr(sw) == (
+            "Stopwatch("
+            f"timer_func={__name__}.repr_contract_timer, "
+            f"exit_callback={__name__}.repr_contract_callback)"
+        )
 
-    def test_repr_uses_fully_qualified_name(self) -> None:
-        """Test __repr__ outputs fully qualified callable names."""
-        sw = Stopwatch()
-        repr_str = repr(sw)
-        assert "timer_func=time.perf_counter" in repr_str
+    def test_repr_is_independent_of_state(self) -> None:
+        """Test __repr__ only represents construction inputs."""
+        timer_values = iter([0.0, 1.0])
 
-    def test_repr_without_callback(self, mock_timer: Mock) -> None:
-        """Test __repr__ without exit callback."""
-        sw = Stopwatch(timer_func=mock_timer, exit_callback=None)
-        repr_str = repr(sw)
-        assert "Stopwatch" in repr_str
-        assert "timer_func=" in repr_str
-        assert "exit_callback=None" in repr_str
+        def state_timer() -> float:
+            """Return the next state-transition timer value."""
+            return next(timer_values)
 
-    def test_repr_independent_of_state(self, stopwatch: Stopwatch) -> None:
-        """Test __repr__ is same regardless of stopwatch state."""
-        repr_not_started = repr(stopwatch)
-        stopwatch.start()
-        repr_running = repr(stopwatch)
-        stopwatch.stop()
-        repr_stopped = repr(stopwatch)
-        # All should show the same constructor info
-        assert "timer_func=" in repr_not_started
-        assert "timer_func=" in repr_running
-        assert "timer_func=" in repr_stopped
+        state_timer.__module__ = "test_module"
+        state_timer.__qualname__ = "state_timer"
+        sw = Stopwatch(timer_func=state_timer)
+        expected = (
+            "Stopwatch(timer_func=test_module.state_timer, exit_callback=None)"
+        )
+
+        repr_not_started = repr(sw)
+        sw.start()
+        repr_running = repr(sw)
+        sw.stop()
+        repr_stopped = repr(sw)
+
+        assert repr_not_started == expected
+        assert repr_running == expected
+        assert repr_stopped == expected
 
 
 class TestStr:
