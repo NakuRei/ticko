@@ -184,7 +184,9 @@ class Stopwatch:
                 return self._timer_func() - self._time_start
             if self._time_stop is not None:
                 return self._time_stop - self._time_start
-            msg = "Invariant: _time_stop must be set when stopped."
+            msg = (  # pragma: no cover
+                "Invariant: _time_stop must be set when stopped."
+            )
             raise AssertionError(msg)
 
     @property
@@ -202,7 +204,9 @@ class Stopwatch:
                 return self._timer_func() - self._time_last_lap_start
             if self._time_stop is not None:
                 return self._time_stop - self._time_last_lap_start
-            msg = "Invariant: _time_stop must be set when stopped."
+            msg = (  # pragma: no cover
+                "Invariant: _time_stop must be set when stopped."
+            )
             raise AssertionError(msg)
 
     def reset(self) -> None:
@@ -249,7 +253,9 @@ class Stopwatch:
                 )
                 raise NotRunningError(msg)
             if self._time_last_lap_start is None:
-                msg = "Invariant: _time_last_lap_start is None while running."
+                msg = (  # pragma: no cover
+                    "Invariant: _time_last_lap_start is None while running."
+                )
                 raise AssertionError(msg)
 
             time_current: Final = self._timer_func()
@@ -274,7 +280,9 @@ class Stopwatch:
                 )
                 raise NotRunningError(msg)
             if self._time_start is None:
-                msg = "Invariant: _time_start is None while running."
+                msg = (  # pragma: no cover
+                    "Invariant: _time_start is None while running."
+                )
                 raise AssertionError(msg)
 
             time_current: Final = self._timer_func()
