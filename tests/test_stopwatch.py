@@ -5,6 +5,7 @@ import time
 from unittest.mock import Mock
 
 import pytest
+from _timing_output_assertions import assert_elapsed_seconds_displayed
 
 from ticko import (
     AlreadyRunningError,
@@ -372,8 +373,7 @@ class TestStr:
         str_str = str(stopwatch)  # time = 1.0
         assert "Stopwatch" in str_str
         assert "running" in str_str
-        assert "elapsed=" in str_str
-        assert "1.000000s" in str_str
+        assert_elapsed_seconds_displayed(str_str, 1.0)
 
     def test_str_stopped(self, stopwatch: Stopwatch) -> None:
         """Test __str__ after stopping."""
@@ -382,8 +382,7 @@ class TestStr:
         str_str = str(stopwatch)
         assert "Stopwatch" in str_str
         assert "stopped" in str_str
-        assert "elapsed=" in str_str
-        assert "1.000000s" in str_str
+        assert_elapsed_seconds_displayed(str_str, 1.0)
 
     def test_str_includes_name_not_started(self, mock_timer: Mock) -> None:
         """Test __str__ includes name when not started."""

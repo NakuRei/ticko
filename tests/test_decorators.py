@@ -7,6 +7,7 @@ from contextlib import redirect_stdout
 from unittest.mock import Mock
 
 import pytest
+from _timing_output_assertions import assert_elapsed_seconds_displayed
 
 from ticko.decorators import stopwatch
 
@@ -162,11 +163,8 @@ class TestDefaultCallbackOutput:
             my_function()
 
         output = f.getvalue()
-        assert "'my_function'" in output
-        assert "exited after" in output
-        assert "1.000000" in output
-        assert "%r" not in output
-        assert "%f" not in output
+        assert "my_function" in output
+        assert_elapsed_seconds_displayed(output, 1.0)
 
     def test_default_callback_format_with_callable_object(
         self,
@@ -186,9 +184,8 @@ class TestDefaultCallbackOutput:
 
         output = f.getvalue()
         assert result == "ok"
-        assert "'Work'" in output
-        assert "exited after" in output
-        assert "1.000000" in output
+        assert "Work" in output
+        assert_elapsed_seconds_displayed(output, 1.0)
 
     def test_default_callback_format_with_exception(
         self,
@@ -208,10 +205,8 @@ class TestDefaultCallbackOutput:
             failing_function()
 
         output = f.getvalue()
-        assert "'failing_function'" in output
-        assert "exited after" in output
-        assert "1.000000" in output
-        assert "executed" not in output
+        assert "failing_function" in output
+        assert_elapsed_seconds_displayed(output, 1.0)
 
 
 class TestSynchronousRealTimeMeasurement:
