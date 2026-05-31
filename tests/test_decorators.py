@@ -17,11 +17,14 @@ def mock_timer() -> Mock:
     return Mock(side_effect=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
 
 
-class TestStopwatchDecorator:
-    """Test cases for the stopwatch decorator."""
+class TestDecorationForms:
+    """Test supported ways to apply the decorator."""
 
-    def test_basic_decoration(self, mock_timer: Mock) -> None:
-        """Test basic function decoration."""
+    def test_configured_decorator_wraps_function(
+        self,
+        mock_timer: Mock,
+    ) -> None:
+        """Test @stopwatch(...) decoration."""
         callback = Mock()
 
         @stopwatch(timer_func=mock_timer, exit_callback=callback)
@@ -34,14 +37,13 @@ class TestStopwatchDecorator:
         callback.assert_called_once()
         assert callback.call_args[0][0] == 1.0
 
-    def test_decorator_without_parentheses(self) -> None:
-        """Test decorator used without parentheses."""
+    def test_bare_decorator_wraps_function(self) -> None:
+        """Test @stopwatch decoration."""
 
         @stopwatch
         def sample_func(x: int) -> int:
             return x + 1
 
-        # When using @stopwatch without parentheses, it uses default callback
         f = io.StringIO()
         with redirect_stdout(f):
             result = sample_func(10)
@@ -50,24 +52,11 @@ class TestStopwatchDecorator:
         output = f.getvalue()
         assert "sample_func" in output
 
-    def test_decorator_with_custom_callback(self, mock_timer: Mock) -> None:
-        """Test decorator with custom exit callback."""
-        callback = Mock()
-
-        @stopwatch(timer_func=mock_timer, exit_callback=callback)
-        def sample_func(x: int, y: int) -> int:
-            return x + y
-
-        result = sample_func(3, 4)
-        assert result == 7
-        callback.assert_called_once()
-        assert callback.call_args[0][0] == 1.0
-
     def test_direct_decoration_with_custom_options(
         self,
         mock_timer: Mock,
     ) -> None:
-        """Test direct decoration with custom timer and callback."""
+        """Test stopwatch(func, ...) decoration."""
         callback = Mock()
 
         def sample_func(x: int) -> int:
@@ -85,6 +74,10 @@ class TestStopwatchDecorator:
         callback.assert_called_once()
         assert callback.call_args[0][0] == 1.0
 
+
+class TestWrappedFunctionBehavior:
+    """Test behavior preserved by the wrapper."""
+
     def test_decorator_preserves_function_metadata(self) -> None:
         """Test decorator preserves function name and docstring."""
 
@@ -95,21 +88,6 @@ class TestStopwatchDecorator:
 
         assert documented_func.__name__ == "documented_func"
         assert documented_func.__doc__ == "This is a documented function."
-
-    def test_decorator_with_exception(self, mock_timer: Mock) -> None:
-        """Test decorator behavior when function raises exception."""
-        callback = Mock()
-
-        @stopwatch(timer_func=mock_timer, exit_callback=callback)
-        def failing_func() -> None:
-            raise ValueError("Test error")
-
-        with pytest.raises(ValueError, match="Test error"):
-            failing_func()
-
-        # Callback should still be called
-        callback.assert_called_once()
-        assert isinstance(callback.call_args[0][0], float)
 
     def test_decorator_with_args_and_kwargs(self) -> None:
         """Test decorator with various argument types."""
@@ -122,6 +100,23 @@ class TestStopwatchDecorator:
         result = complex_func(1, 2, 3, 4, x="hello", y="world")
         assert result == "1-2-(3, 4)-{'x': 'hello', 'y': 'world'}"
         callback.assert_called_once()
+
+
+class TestExitCallbackTiming:
+    """Test elapsed time passed to exit callbacks."""
+
+    def test_decorator_with_custom_callback(self, mock_timer: Mock) -> None:
+        """Test decorator with custom exit callback."""
+        callback = Mock()
+
+        @stopwatch(timer_func=mock_timer, exit_callback=callback)
+        def sample_func(x: int, y: int) -> int:
+            return x + y
+
+        result = sample_func(3, 4)
+        assert result == 7
+        callback.assert_called_once()
+        assert callback.call_args[0][0] == 1.0
 
     def test_decorator_with_custom_timer(self) -> None:
         """Test decorator with custom timer function."""
@@ -136,6 +131,24 @@ class TestStopwatchDecorator:
         assert result == "done"
         callback.assert_called_once()
         assert callback.call_args[0][0] == 100.0
+
+    def test_decorator_with_exception(self, mock_timer: Mock) -> None:
+        """Test decorator behavior when function raises exception."""
+        callback = Mock()
+
+        @stopwatch(timer_func=mock_timer, exit_callback=callback)
+        def failing_func() -> None:
+            raise ValueError("Test error")
+
+        with pytest.raises(ValueError, match="Test error"):
+            failing_func()
+
+        callback.assert_called_once()
+        assert isinstance(callback.call_args[0][0], float)
+
+
+class TestDefaultCallbackOutput:
+    """Test output written by the default callback."""
 
     def test_default_callback_format(self, mock_timer: Mock) -> None:
         """Test the default callback output format."""
@@ -201,8 +214,8 @@ class TestStopwatchDecorator:
         assert "executed" not in output
 
 
-class TestStopwatchDecoratorRealTime:
-    """Test stopwatch decorator with real time."""
+class TestSynchronousRealTimeMeasurement:
+    """Test synchronous timing with the default timer."""
 
     def test_real_time_measurement(self) -> None:
         """Test decorator with actual time delays."""
@@ -222,8 +235,8 @@ class TestStopwatchDecoratorRealTime:
         assert times[0] > 0.09
 
 
-class TestStopwatchDecoratorAsyncFunction:
-    """Test stopwatch decorator with async functions."""
+class TestAsyncWrappedFunctions:
+    """Test async functions and callable objects."""
 
     def test_async_function_callback_runs_after_awaited_body(self) -> None:
         """Test callback runs after an async function body completes."""

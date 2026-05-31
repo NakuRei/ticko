@@ -27,8 +27,8 @@ def stopwatch(mock_timer: Mock) -> Stopwatch:
     return Stopwatch(timer_func=mock_timer)
 
 
-class TestStopwatchBasicOperations:
-    """Test basic Stopwatch operations."""
+class TestLifecycleOperations:
+    """Test Stopwatch lifecycle state changes."""
 
     def test_initial_state(self, stopwatch: Stopwatch) -> None:
         """Test stopwatch initial state."""
@@ -43,12 +43,6 @@ class TestStopwatchBasicOperations:
         assert stopwatch.time_start == 0.0
         assert stopwatch.time_stop is None
 
-    def test_start_already_running(self, stopwatch: Stopwatch) -> None:
-        """Test starting an already running stopwatch raises error."""
-        stopwatch.start()
-        with pytest.raises(AlreadyRunningError, match="already running"):
-            stopwatch.start()
-
     def test_stop(self, stopwatch: Stopwatch) -> None:
         """Test stopping the stopwatch."""
         stopwatch.start()  # time = 0.0
@@ -56,11 +50,6 @@ class TestStopwatchBasicOperations:
         assert elapsed == 1.0
         assert not stopwatch.is_running
         assert stopwatch.time_stop == 1.0
-
-    def test_stop_not_started(self, stopwatch: Stopwatch) -> None:
-        """Test stopping a non-running stopwatch raises error."""
-        with pytest.raises(NotRunningError, match="not running"):
-            stopwatch.stop()
 
     def test_reset(self, stopwatch: Stopwatch) -> None:
         """Test resetting the stopwatch."""
@@ -82,7 +71,22 @@ class TestStopwatchBasicOperations:
         assert stopwatch.is_running
 
 
-class TestStopwatchLapFunctionality:
+class TestInvalidLifecycleOperations:
+    """Test invalid lifecycle transitions."""
+
+    def test_start_already_running(self, stopwatch: Stopwatch) -> None:
+        """Test starting an already running stopwatch raises error."""
+        stopwatch.start()
+        with pytest.raises(AlreadyRunningError, match="already running"):
+            stopwatch.start()
+
+    def test_stop_not_started(self, stopwatch: Stopwatch) -> None:
+        """Test stopping a non-running stopwatch raises error."""
+        with pytest.raises(NotRunningError, match="not running"):
+            stopwatch.stop()
+
+
+class TestLapOperations:
     """Test lap recording functionality."""
 
     def test_lap(self, stopwatch: Stopwatch) -> None:
@@ -100,8 +104,8 @@ class TestStopwatchLapFunctionality:
             stopwatch.lap()
 
 
-class TestStopwatchProperties:
-    """Test Stopwatch property accessors."""
+class TestElapsedTime:
+    """Test total elapsed time property access."""
 
     def test_time_elapsed_while_running(self, stopwatch: Stopwatch) -> None:
         """Test getting elapsed time while running."""
@@ -120,6 +124,10 @@ class TestStopwatchProperties:
         """Test getting elapsed time before starting raises error."""
         with pytest.raises(NotStartedError, match="not been started"):
             _ = stopwatch.time_elapsed
+
+
+class TestLapElapsedTime:
+    """Test elapsed time since the last lap."""
 
     def test_time_since_last_lap_while_running(
         self, stopwatch: Stopwatch
@@ -163,7 +171,7 @@ class TestStopwatchProperties:
             _ = stopwatch.time_since_last_lap
 
 
-class TestStopwatchContextManager:
+class TestContextManager:
     """Test context manager functionality."""
 
     def test_context_manager(self, stopwatch: Stopwatch) -> None:
@@ -184,8 +192,28 @@ class TestStopwatchContextManager:
         assert not stopwatch.is_running
         assert stopwatch.time_stop is not None
 
+    def test_context_manager_early_stop(self, stopwatch: Stopwatch) -> None:
+        """Test context manager does not raise when stop() already called."""
+        with stopwatch:
+            stopwatch.stop()
+        # __exit__ should not raise even though stopwatch is already stopped
+        assert not stopwatch.is_running
 
-class TestStopwatchCallbacks:
+    def test_context_manager_early_stop_with_exception(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test original exception is not masked when stop() called early."""
+
+        def _trigger() -> None:
+            with stopwatch:
+                stopwatch.stop()
+                raise ValueError("early stop")
+
+        with pytest.raises(ValueError, match="early stop"):
+            _trigger()
+
+
+class TestExitCallbacks:
     """Test callback functionality."""
 
     def test_exit_callback(self, mock_timer: Mock) -> None:
@@ -215,6 +243,10 @@ class TestStopwatchCallbacks:
         sw.stop()
         callback.assert_called_once()
 
+
+class TestTimerFunction:
+    """Test custom timer function behavior."""
+
     def test_custom_timer_func(self) -> None:
         """Test using custom timer function."""
         custom_timer = Mock(side_effect=[10.0, 20.0, 30.0])
@@ -225,7 +257,7 @@ class TestStopwatchCallbacks:
         assert custom_timer.call_count == 2
 
 
-class TestStopwatchName:
+class TestNameOption:
     """Test Stopwatch name parameter."""
 
     def test_name_default_is_none(self, stopwatch: Stopwatch) -> None:
@@ -236,38 +268,6 @@ class TestStopwatchName:
         """Test name is stored correctly."""
         sw = Stopwatch(name="my_sw", timer_func=mock_timer)
         assert sw.name == "my_sw"
-
-    def test_str_includes_name_not_started(self, mock_timer: Mock) -> None:
-        """Test __str__ includes name when not started."""
-        sw = Stopwatch(name="db", timer_func=mock_timer)
-        assert "'db'" in str(sw)
-        assert "not started" in str(sw)
-
-    def test_str_includes_name_running(self, mock_timer: Mock) -> None:
-        """Test __str__ includes name while running."""
-        sw = Stopwatch(name="db", timer_func=mock_timer)
-        sw.start()  # time = 0.0
-        result = str(sw)  # time = 1.0
-        assert "'db'" in result
-        assert "running" in result
-
-    def test_str_includes_name_stopped(self, mock_timer: Mock) -> None:
-        """Test __str__ includes name after stopping."""
-        sw = Stopwatch(name="db", timer_func=mock_timer)
-        sw.start()  # time = 0.0
-        sw.stop()  # time = 1.0
-        result = str(sw)
-        assert "'db'" in result
-        assert "stopped" in result
-
-    def test_repr_includes_name(self, mock_timer: Mock) -> None:
-        """Test __repr__ includes name when set."""
-        sw = Stopwatch(name="db", timer_func=mock_timer)
-        assert "name='db'" in repr(sw)
-
-    def test_repr_omits_name_when_none(self, stopwatch: Stopwatch) -> None:
-        """Test __repr__ omits name when not set."""
-        assert "name=" not in repr(stopwatch)
 
     def test_log_includes_name_on_start(
         self, mock_timer: Mock, caplog: pytest.LogCaptureFixture
@@ -289,7 +289,7 @@ class TestStopwatchName:
         assert "timer_b" in caplog.text
 
 
-class TestStopwatchRepr:
+class TestRepr:
     """Test Stopwatch string representation."""
 
     def test_repr_with_default_timer(self, stopwatch: Stopwatch) -> None:
@@ -298,6 +298,15 @@ class TestStopwatchRepr:
         assert "Stopwatch" in repr_str
         assert "timer_func=" in repr_str
         assert "exit_callback=" in repr_str
+
+    def test_repr_includes_name(self, mock_timer: Mock) -> None:
+        """Test __repr__ includes name when set."""
+        sw = Stopwatch(name="db", timer_func=mock_timer)
+        assert "name='db'" in repr(sw)
+
+    def test_repr_omits_name_when_none(self, stopwatch: Stopwatch) -> None:
+        """Test __repr__ omits name when not set."""
+        assert "name=" not in repr(stopwatch)
 
     def test_repr_with_callback(self, mock_timer: Mock) -> None:
         """Test __repr__ with exit callback."""
@@ -338,7 +347,7 @@ class TestStopwatchRepr:
         assert "timer_func=" in repr_stopped
 
 
-class TestStopwatchStr:
+class TestStr:
     """Test Stopwatch human-readable string representation."""
 
     def test_str_not_started(self, stopwatch: Stopwatch) -> None:
@@ -366,6 +375,29 @@ class TestStopwatchStr:
         assert "elapsed=" in str_str
         assert "1.000000s" in str_str
 
+    def test_str_includes_name_not_started(self, mock_timer: Mock) -> None:
+        """Test __str__ includes name when not started."""
+        sw = Stopwatch(name="db", timer_func=mock_timer)
+        assert "'db'" in str(sw)
+        assert "not started" in str(sw)
+
+    def test_str_includes_name_running(self, mock_timer: Mock) -> None:
+        """Test __str__ includes name while running."""
+        sw = Stopwatch(name="db", timer_func=mock_timer)
+        sw.start()  # time = 0.0
+        result = str(sw)  # time = 1.0
+        assert "'db'" in result
+        assert "running" in result
+
+    def test_str_includes_name_stopped(self, mock_timer: Mock) -> None:
+        """Test __str__ includes name after stopping."""
+        sw = Stopwatch(name="db", timer_func=mock_timer)
+        sw.start()  # time = 0.0
+        sw.stop()  # time = 1.0
+        result = str(sw)
+        assert "'db'" in result
+        assert "stopped" in result
+
     def test_str_changes_with_state(self, stopwatch: Stopwatch) -> None:
         """Test __str__ changes based on stopwatch state."""
         str_not_started = str(stopwatch)
@@ -390,7 +422,7 @@ class TestStopwatchStr:
         assert "timer_func=" in repr_str
 
 
-class TestStopwatchRealTime:
+class TestRealTimeMeasurement:
     """Test Stopwatch with real time functions."""
 
     def test_real_elapsed_time(self) -> None:
@@ -413,27 +445,3 @@ class TestStopwatchRealTime:
 
         assert lap1 > 0.04
         assert lap2 > 0.04
-
-
-class TestStopwatchContextManagerEarlyStop:
-    """Test context manager handles early stop gracefully."""
-
-    def test_context_manager_early_stop(self, stopwatch: Stopwatch) -> None:
-        """Test context manager does not raise when stop() already called."""
-        with stopwatch:
-            stopwatch.stop()
-        # __exit__ should not raise even though stopwatch is already stopped
-        assert not stopwatch.is_running
-
-    def test_context_manager_early_stop_with_exception(
-        self, stopwatch: Stopwatch
-    ) -> None:
-        """Test original exception is not masked when stop() called early."""
-
-        def _trigger() -> None:
-            with stopwatch:
-                stopwatch.stop()
-                raise ValueError("early stop")
-
-        with pytest.raises(ValueError, match="early stop"):
-            _trigger()
