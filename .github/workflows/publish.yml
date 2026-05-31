@@ -22,7 +22,27 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
+
+      - name: Verify tag matches package version
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          with Path("pyproject.toml").open("rb") as pyproject_file:
+              package_version = tomllib.load(pyproject_file)["project"]["version"]
+          tag_version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+
+          if package_version != tag_version:
+              print(
+                  f"Tag version {tag_version} does not match package version {package_version}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          PY
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
