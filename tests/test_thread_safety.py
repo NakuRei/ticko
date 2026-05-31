@@ -2,184 +2,432 @@
 
 import threading
 import time
+from collections.abc import Callable
 from typing import Any
+
+import pytest
 
 from ticko import (
     AlreadyRunningError,
+    NoLapsRecordedError,
     NotRunningError,
     NotStartedError,
     Stopwatch,
 )
 
+_THREAD_TIMEOUT = 1.0
+Outcome = tuple[str, Any]
+GetterSnapshot = dict[str, Outcome]
+
+
+class MonotonicTimer:
+    """Return monotonically increasing values across threads."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._value = 0.0
+
+    def __call__(self) -> float:
+        """Return the next timer value."""
+        with self._lock:
+            current = self._value
+            self._value += 1.0
+            return current
+
+
+def make_stopwatch() -> Stopwatch:
+    """Create a stopwatch backed by a deterministic timer."""
+    return Stopwatch(timer_func=MonotonicTimer())
+
+
+def capture_outcome(operation: Callable[[], Any]) -> Outcome:
+    """Return either the operation result or the raised exception."""
+    try:
+        return ("return", operation())
+    except Exception as exc:
+        return ("raise", exc)
+
+
+def run_concurrently(*operations: Callable[[], Any]) -> list[Outcome]:
+    """Run operations together and collect their outcomes."""
+    barrier = threading.Barrier(len(operations) + 1, timeout=_THREAD_TIMEOUT)
+    worker_failures: list[Exception] = []
+    worker_failures_lock = threading.Lock()
+    outcomes: list[Outcome | None] = [None] * len(operations)
+
+    def run_operation(index: int, operation: Callable[[], Any]) -> None:
+        try:
+            barrier.wait()
+            outcomes[index] = capture_outcome(operation)
+        except Exception as exc:
+            with worker_failures_lock:
+                worker_failures.append(exc)
+
+    threads = [
+        threading.Thread(target=run_operation, args=(index, operation))
+        for index, operation in enumerate(operations)
+    ]
+    for thread in threads:
+        thread.start()
+
+    try:
+        barrier.wait()
+    except threading.BrokenBarrierError as exc:  # pragma: no cover - assertion
+        pytest.fail(f"Failed to start concurrent operations: {exc}")
+
+    for thread in threads:
+        thread.join(timeout=_THREAD_TIMEOUT)
+
+    still_running = [thread.name for thread in threads if thread.is_alive()]
+    assert not still_running, f"Threads did not finish: {still_running}"
+    assert not worker_failures, f"Unexpected worker failures: {worker_failures}"
+    assert all(outcome is not None for outcome in outcomes)
+    return [outcome for outcome in outcomes if outcome is not None]
+
+
+def collect_getter_outcomes(sw: Stopwatch) -> GetterSnapshot:
+    """Read the public Stopwatch getters and capture each result separately."""
+    return {
+        "is_running": capture_outcome(lambda: sw.is_running),
+        "time_start": capture_outcome(lambda: sw.time_start),
+        "time_stop": capture_outcome(lambda: sw.time_stop),
+        "time_elapsed": capture_outcome(lambda: sw.time_elapsed),
+        "time_since_last_lap": capture_outcome(lambda: sw.time_since_last_lap),
+    }
+
+
+def assert_non_negative_number(value: Any) -> None:
+    """Assert that a value is a non-negative numeric duration or timestamp."""
+    assert isinstance(value, int | float)
+    assert not isinstance(value, bool)
+    assert value >= 0
+
+
+def assert_returned(outcome: Outcome) -> Any:
+    """Assert that a concurrent call returned successfully."""
+    kind, value = outcome
+    assert kind == "return"
+    return value
+
+
+def assert_raised(outcome: Outcome, exc_type: type[Exception]) -> Exception:
+    """Assert that a concurrent call raised the expected exception type."""
+    kind, value = outcome
+    assert kind == "raise"
+    assert isinstance(value, exc_type)
+    return value
+
+
+def assert_reset_state(sw: Stopwatch) -> None:
+    """Assert that the stopwatch is back in its public initial state."""
+    assert not sw.is_running
+    assert sw.time_start is None
+    assert sw.time_stop is None
+    with pytest.raises(NotStartedError):
+        _ = sw.time_elapsed
+    with pytest.raises(NoLapsRecordedError):
+        _ = sw.time_since_last_lap
+
+
+def assert_running_state(sw: Stopwatch) -> None:
+    """Assert that the stopwatch is in a valid running state."""
+    assert sw.is_running
+    assert sw.time_start is not None
+    assert_non_negative_number(sw.time_start)
+    assert sw.time_stop is None
+
+
+def assert_stopped_state(sw: Stopwatch, expected_elapsed: float) -> None:
+    """Assert that the stopwatch is in a valid stopped state."""
+    assert not sw.is_running
+    assert sw.time_start is not None
+    assert_non_negative_number(sw.time_start)
+    assert sw.time_stop is not None
+    assert_non_negative_number(sw.time_stop)
+    assert sw.time_elapsed == expected_elapsed
+
+
+def assert_getter_snapshot_during_running_reset(
+    snapshot: GetterSnapshot,
+) -> None:
+    """Validate getter outcomes while reset() races with readers."""
+    assert_returned(snapshot["is_running"])
+    assert isinstance(snapshot["is_running"][1], bool)
+
+    time_start = assert_returned(snapshot["time_start"])
+    if time_start is not None:
+        assert_non_negative_number(time_start)
+
+    assert snapshot["time_stop"] == ("return", None)
+
+    time_elapsed = snapshot["time_elapsed"]
+    if time_elapsed[0] == "return":
+        assert_non_negative_number(time_elapsed[1])
+    else:
+        assert_raised(time_elapsed, NotStartedError)
+
+    assert_raised(snapshot["time_since_last_lap"], NoLapsRecordedError)
+
+
+def assert_getter_snapshot_during_stop(snapshot: GetterSnapshot) -> None:
+    """Validate getter outcomes while stop() races with readers."""
+    is_running = assert_returned(snapshot["is_running"])
+    assert isinstance(is_running, bool)
+
+    time_start = assert_returned(snapshot["time_start"])
+    assert_non_negative_number(time_start)
+
+    time_stop = assert_returned(snapshot["time_stop"])
+    if time_stop is not None:
+        assert_non_negative_number(time_stop)
+
+    time_elapsed = assert_returned(snapshot["time_elapsed"])
+    assert_non_negative_number(time_elapsed)
+
+    assert_raised(snapshot["time_since_last_lap"], NoLapsRecordedError)
+
+
+def assert_getter_snapshot_during_lap(snapshot: GetterSnapshot) -> None:
+    """Validate getter outcomes while lap() races with readers."""
+    is_running = assert_returned(snapshot["is_running"])
+    assert is_running is True
+
+    time_start = assert_returned(snapshot["time_start"])
+    assert_non_negative_number(time_start)
+
+    assert snapshot["time_stop"] == ("return", None)
+
+    time_elapsed = assert_returned(snapshot["time_elapsed"])
+    assert_non_negative_number(time_elapsed)
+
+    time_since_last_lap = snapshot["time_since_last_lap"]
+    if time_since_last_lap[0] == "return":
+        assert_non_negative_number(time_since_last_lap[1])
+    else:
+        assert_raised(time_since_last_lap, NoLapsRecordedError)
+
 
 class TestThreadSafety:
-    """Test cases for thread safety."""
+    """Test cases for public thread-safety guarantees."""
 
-    def test_concurrent_property_reads(self) -> None:
-        """Test reading properties from multiple threads."""
-        sw = Stopwatch()
+    def test_getters_allow_public_outcomes_during_running_reset(self) -> None:
+        """Getter races with reset() should expose only public states."""
+        sw = make_stopwatch()
         sw.start()
-        results: list[tuple[str, Any]] = []
-        errors: list[Exception] = []
 
-        def read_properties() -> None:
-            try:
-                for _ in range(100):
-                    results.append(("is_running", sw.is_running))
-                    results.append(("time_start", sw.time_start))
-                    results.append(("time_elapsed", sw.time_elapsed))
-            except Exception as e:
-                errors.append(e)
+        def getter_reader() -> GetterSnapshot:
+            return collect_getter_outcomes(sw)
 
-        threads = [threading.Thread(target=read_properties) for _ in range(5)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        outcomes = run_concurrently(
+            getter_reader,
+            getter_reader,
+            getter_reader,
+            sw.reset,
+        )
 
-        sw.stop()
-        assert len(errors) == 0, f"Unexpected errors: {errors}"
+        for snapshot_outcome in outcomes[:3]:
+            snapshot = assert_returned(snapshot_outcome)
+            assert_getter_snapshot_during_running_reset(snapshot)
+
+        reset_outcome = outcomes[3]
+        assert assert_returned(reset_outcome) is None
+        assert_reset_state(sw)
+
+    def test_getters_allow_public_outcomes_during_stop(self) -> None:
+        """Getter races with stop() should expose only public states."""
+        sw = make_stopwatch()
+        sw.start()
+
+        def getter_reader() -> GetterSnapshot:
+            return collect_getter_outcomes(sw)
+
+        outcomes = run_concurrently(
+            getter_reader,
+            getter_reader,
+            getter_reader,
+            sw.stop,
+        )
+
+        for snapshot_outcome in outcomes[:3]:
+            snapshot = assert_returned(snapshot_outcome)
+            assert_getter_snapshot_during_stop(snapshot)
+
+        stop_outcome = outcomes[3]
+        stop_elapsed = assert_returned(stop_outcome)
+        assert_non_negative_number(stop_elapsed)
+        assert_stopped_state(sw, stop_elapsed)
+
+    def test_getters_allow_public_outcomes_during_lap(self) -> None:
+        """Getter races with lap() should expose only public states."""
+        sw = make_stopwatch()
+        sw.start()
+
+        def getter_reader() -> GetterSnapshot:
+            return collect_getter_outcomes(sw)
+
+        outcomes = run_concurrently(
+            getter_reader,
+            getter_reader,
+            getter_reader,
+            sw.lap,
+        )
+
+        for snapshot_outcome in outcomes[:3]:
+            snapshot = assert_returned(snapshot_outcome)
+            assert_getter_snapshot_during_lap(snapshot)
+
+        lap_outcome = outcomes[3]
+        lap_duration = assert_returned(lap_outcome)
+        assert_non_negative_number(lap_duration)
+        assert_running_state(sw)
+        assert_non_negative_number(sw.time_since_last_lap)
 
     def test_concurrent_laps(self) -> None:
-        """Test recording laps from multiple threads."""
-        sw = Stopwatch()
+        """Concurrent lap() calls should record non-negative lap durations."""
+        sw = make_stopwatch()
         sw.start()
+
         lap_times: list[float] = []
-        errors: list[Exception] = []
+        lap_times_lock = threading.Lock()
+        worker_failures: list[Exception] = []
+        worker_failures_lock = threading.Lock()
+        barrier = threading.Barrier(4, timeout=_THREAD_TIMEOUT)
 
         def record_laps() -> None:
             try:
-                for _ in range(10):
-                    lap_time = sw.lap()
-                    lap_times.append(lap_time)
-                    time.sleep(0.001)
-            except Exception as e:
-                errors.append(e)
+                barrier.wait()
+                local_laps = [sw.lap() for _ in range(10)]
+                with lap_times_lock:
+                    lap_times.extend(local_laps)
+            except Exception as exc:
+                with worker_failures_lock:
+                    worker_failures.append(exc)
 
         threads = [threading.Thread(target=record_laps) for _ in range(3)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        for thread in threads:
+            thread.start()
 
-        sw.stop()
-        assert len(errors) == 0, f"Unexpected errors: {errors}"
-        assert len(lap_times) == 30  # 10 laps * 3 threads
-        # All lap times should be non-negative
+        try:
+            barrier.wait()
+        except threading.BrokenBarrierError as exc:  # pragma: no cover
+            pytest.fail(f"Failed to start concurrent lap workers: {exc}")
+
+        for thread in threads:
+            thread.join(timeout=_THREAD_TIMEOUT)
+
+        still_running = [thread.name for thread in threads if thread.is_alive()]
+        assert not still_running, f"Threads did not finish: {still_running}"
+        assert not worker_failures, (
+            f"Unexpected worker failures: {worker_failures}"
+        )
+        assert len(lap_times) == 30
         for lap_time in lap_times:
-            assert lap_time >= 0
+            assert_non_negative_number(lap_time)
 
     def test_concurrent_start_attempts(self) -> None:
-        """Test multiple threads trying to start stopwatch."""
-        sw = Stopwatch()
-        start_count = 0
-        error_count = 0
-        lock = threading.Lock()
+        """Only one concurrent start() should succeed on a shared stopwatch."""
+        sw = make_stopwatch()
+        outcomes = run_concurrently(*(sw.start for _ in range(10)))
 
-        def try_start() -> None:
-            nonlocal start_count, error_count
-            try:
-                sw.start()
-                with lock:
-                    start_count += 1
-            except AlreadyRunningError:
-                with lock:
-                    error_count += 1
+        success_count = sum(
+            1 for outcome in outcomes if outcome == ("return", None)
+        )
+        error_count = sum(
+            1
+            for outcome in outcomes
+            if outcome[0] == "raise"
+            and isinstance(outcome[1], AlreadyRunningError)
+        )
 
-        threads = [threading.Thread(target=try_start) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        # Only one thread should successfully start
-        assert start_count == 1
+        assert success_count == 1
         assert error_count == 9
-        assert sw.is_running
-        sw.stop()
+        assert_running_state(sw)
 
     def test_concurrent_stop_attempts(self) -> None:
-        """Test multiple threads trying to stop stopwatch."""
-        sw = Stopwatch()
+        """Only one concurrent stop() should succeed on a shared stopwatch."""
+        sw = make_stopwatch()
         sw.start()
-        time.sleep(0.01)  # Let it run for a bit
+        outcomes = run_concurrently(*(sw.stop for _ in range(10)))
 
-        stop_count = 0
-        error_count = 0
-        lock = threading.Lock()
-
-        def try_stop() -> None:
-            nonlocal stop_count, error_count
-            try:
-                sw.stop()
-                with lock:
-                    stop_count += 1
-            except NotRunningError:
-                with lock:
-                    error_count += 1
-
-        threads = [threading.Thread(target=try_stop) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        # Only one thread should successfully stop
-        assert stop_count == 1
-        assert error_count == 9
-        assert not sw.is_running
-
-    def test_reset_while_reading(self) -> None:
-        """Test resetting while other threads are reading."""
-        sw = Stopwatch()
-        sw.start()
-        time.sleep(0.01)
-
-        should_stop = threading.Event()
-        errors: list[Exception] = []
-
-        def continuous_read() -> None:
-            try:
-                while not should_stop.is_set():
-                    try:
-                        _ = sw.is_running
-                        if sw.time_start is not None:
-                            _ = sw.time_elapsed
-                    except NotStartedError:
-                        # Expected after reset
-                        pass
-                    time.sleep(0.0001)
-            except Exception as e:
-                errors.append(e)
-
-        def reset_stopwatch() -> None:
-            try:
-                time.sleep(0.005)
-                sw.stop()
-                sw.reset()
-            except Exception as e:
-                errors.append(e)
-
-        reader_threads = [
-            threading.Thread(target=continuous_read) for _ in range(3)
+        successful_stops = [
+            outcome[1] for outcome in outcomes if outcome[0] == "return"
         ]
-        reset_thread = threading.Thread(target=reset_stopwatch)
+        stop_errors = [
+            outcome[1]
+            for outcome in outcomes
+            if outcome[0] == "raise" and isinstance(outcome[1], NotRunningError)
+        ]
 
-        for t in reader_threads:
-            t.start()
-        reset_thread.start()
+        assert len(successful_stops) == 1
+        assert_non_negative_number(successful_stops[0])
+        assert len(stop_errors) == 9
+        assert_stopped_state(sw, successful_stops[0])
 
-        reset_thread.join()
-        time.sleep(0.01)
-        should_stop.set()
+    def test_running_reset_and_stop_race(self) -> None:
+        """reset() and stop() should expose only legal public outcomes."""
+        sw = make_stopwatch()
+        sw.start()
+        reset_outcome, stop_outcome = run_concurrently(sw.reset, sw.stop)
 
-        for t in reader_threads:
-            t.join()
+        assert assert_returned(reset_outcome) is None
 
-        assert len(errors) == 0, f"Unexpected errors: {errors}"
+        if stop_outcome[0] == "return":
+            assert_non_negative_number(stop_outcome[1])
+        else:
+            assert_raised(stop_outcome, NotRunningError)
+
+        assert_reset_state(sw)
+
+    def test_running_start_and_reset_race(self) -> None:
+        """start() and reset() should expose only legal public outcomes."""
+        sw = make_stopwatch()
+        sw.start()
+        start_outcome, reset_outcome = run_concurrently(sw.start, sw.reset)
+
+        assert assert_returned(reset_outcome) is None
+
+        if start_outcome[0] == "return":
+            assert start_outcome[1] is None
+            assert_running_state(sw)
+        else:
+            assert_raised(start_outcome, AlreadyRunningError)
+            assert_reset_state(sw)
+
+    def test_lap_and_stop_race(self) -> None:
+        """lap() and stop() should expose only legal public outcomes."""
+        sw = make_stopwatch()
+        sw.start()
+        lap_outcome, stop_outcome = run_concurrently(sw.lap, sw.stop)
+
+        stop_elapsed = assert_returned(stop_outcome)
+        assert_non_negative_number(stop_elapsed)
+        assert_stopped_state(sw, stop_elapsed)
+
+        if lap_outcome[0] == "return":
+            assert_non_negative_number(lap_outcome[1])
+            assert_non_negative_number(sw.time_since_last_lap)
+        else:
+            assert_raised(lap_outcome, NotRunningError)
+            with pytest.raises(NoLapsRecordedError):
+                _ = sw.time_since_last_lap
+
+    def test_lap_and_reset_race(self) -> None:
+        """lap() and reset() should expose only legal public outcomes."""
+        sw = make_stopwatch()
+        sw.start()
+        lap_outcome, reset_outcome = run_concurrently(sw.lap, sw.reset)
+
+        assert assert_returned(reset_outcome) is None
+
+        if lap_outcome[0] == "return":
+            assert_non_negative_number(lap_outcome[1])
+        else:
+            assert_raised(lap_outcome, NotRunningError)
+
+        assert_reset_state(sw)
 
     def test_context_manager_in_threads(self) -> None:
-        """Test using stopwatch as context manager in multiple threads."""
+        """Using independent context managers in threads remains safe."""
         results: list[float] = []
         errors: list[Exception] = []
 
@@ -190,16 +438,16 @@ class TestThreadSafety:
                     time.sleep(0.01)
                     elapsed = sw.time_elapsed
                 results.append(elapsed)
-            except Exception as e:
-                errors.append(e)
+            except Exception as exc:
+                errors.append(exc)
 
         threads = [
             threading.Thread(target=use_context_manager) for _ in range(5)
         ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
 
         assert len(errors) == 0, f"Unexpected errors: {errors}"
         assert len(results) == 5
@@ -207,12 +455,12 @@ class TestThreadSafety:
             assert elapsed > 0.009
 
     def test_callback_thread_safety(self) -> None:
-        """Test that exit callbacks are thread-safe."""
+        """Using exit callbacks across independent instances remains safe."""
         callback_calls: list[float] = []
-        lock = threading.Lock()
+        callback_calls_lock = threading.Lock()
 
         def thread_safe_callback(elapsed: float) -> None:
-            with lock:
+            with callback_calls_lock:
                 callback_calls.append(elapsed)
 
         def run_stopwatch() -> None:
@@ -222,41 +470,25 @@ class TestThreadSafety:
             sw.stop()
 
         threads = [threading.Thread(target=run_stopwatch) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
 
         assert len(callback_calls) == 10
 
 
-class TestRaceConditions:
-    """Test for potential race conditions."""
-
-    def test_start_stop_race(self) -> None:
-        """Test rapid start/stop cycles."""
-        sw = Stopwatch()
-        errors: list[Exception] = []
-
-        for _ in range(100):
-            try:
-                sw.start()
-                sw.stop()
-                sw.reset()
-            except Exception as e:
-                errors.append(e)
-
-        assert len(errors) == 0
+class TestBehaviorUnderLoad:
+    """Behavior tests that still exercise the shared stopwatch repeatedly."""
 
     def test_lap_property_consistency(self) -> None:
-        """Test that lap times and properties remain consistent."""
+        """time_since_last_lap should reset close to zero after lap()."""
         sw = Stopwatch()
         sw.start()
 
         for _ in range(50):
             sw.lap()
             last_lap_property = sw.time_since_last_lap
-            # The property should be very close to 0 right after lap
             assert last_lap_property < 0.01
 
         sw.stop()
