@@ -90,6 +90,8 @@ def my_function():
     pass
 ```
 
+Or route timing to the logging system:
+
 ```python
 import logging
 
