@@ -43,7 +43,7 @@ def process_data():
     # Your code here
     pass
 
-process_data()  # Automatically prints execution time
+process_data()  # Prints execution time to stdout by default
 ```
 
 ## Core Features
@@ -72,9 +72,34 @@ elapsed = sw.stop()
 
 ### Custom Callbacks
 
+`@stopwatch` prints a human-readable timing message to stdout by default. This
+is useful for scripts, examples, and interactive use where immediate feedback is
+the goal. If stdout is used for structured data or piped output, pass
+`exit_callback` to route timing information elsewhere.
+
 ```python
+import sys
+
+
+def report_time(elapsed: float) -> None:
+    print(f"Execution took {elapsed:.3f}s", file=sys.stderr)
+
+
+@stopwatch(exit_callback=report_time)
+def my_function():
+    pass
+```
+
+```python
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 def log_time(elapsed: float) -> None:
-    logger.info(f"Execution took {elapsed:.3f}s")
+    logger.info("Execution took %.3fs", elapsed)
+
 
 @stopwatch(exit_callback=log_time)
 def my_function():
@@ -121,7 +146,11 @@ For more examples, see the [`examples/`](examples/) directory.
 
 ### `@stopwatch`
 
-Decorator for automatic function timing with optional custom callbacks.
+Decorator for quick, visible function timing.
+
+By default, the decorator prints a human-readable timing message to stdout every
+time the decorated function exits. Use `exit_callback` when timing information
+should go to stderr, logging, metrics, or another destination.
 
 ## Development
 
