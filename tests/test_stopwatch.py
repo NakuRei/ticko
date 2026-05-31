@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from ticko._stopwatch import (
+from ticko import (
     AlreadyRunningError,
     NoLapsRecordedError,
     NotRunningError,
@@ -274,9 +274,14 @@ class TestNameOption:
     ) -> None:
         """Test log message includes name on start."""
         sw = Stopwatch(name="timer_a", timer_func=mock_timer)
-        with caplog.at_level(logging.DEBUG, logger="ticko._stopwatch"):
+        with caplog.at_level(logging.DEBUG, logger="ticko"):
             sw.start()
-        assert "timer_a" in caplog.text
+        assert any(
+            record.levelno == logging.DEBUG
+            and (record.name == "ticko" or record.name.startswith("ticko."))
+            and "timer_a" in record.getMessage()
+            for record in caplog.records
+        )
 
     def test_log_includes_name_on_stop(
         self, mock_timer: Mock, caplog: pytest.LogCaptureFixture
@@ -284,9 +289,14 @@ class TestNameOption:
         """Test log message includes name on stop."""
         sw = Stopwatch(name="timer_b", timer_func=mock_timer)
         sw.start()
-        with caplog.at_level(logging.DEBUG, logger="ticko._stopwatch"):
+        with caplog.at_level(logging.DEBUG, logger="ticko"):
             sw.stop()
-        assert "timer_b" in caplog.text
+        assert any(
+            record.levelno == logging.DEBUG
+            and (record.name == "ticko" or record.name.startswith("ticko."))
+            and "timer_b" in record.getMessage()
+            for record in caplog.records
+        )
 
 
 class TestRepr:
