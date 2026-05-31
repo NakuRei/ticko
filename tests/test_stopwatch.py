@@ -53,13 +53,22 @@ class TestLifecycleOperations:
         assert stopwatch.time_start == 0.0
         assert stopwatch.time_stop is None
 
-    def test_stop(self, stopwatch: Stopwatch) -> None:
-        """Test stopping the stopwatch."""
+    def test_stop_records_stop_time_and_returns_elapsed_time(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test stop() stores the stop time and returns the elapsed time."""
         stopwatch.start()  # time = 0.0
         elapsed = stopwatch.stop()  # time = 1.0
-        assert elapsed == 1.0
+
+        time_start = stopwatch.time_start
+        time_stop = stopwatch.time_stop
+
+        assert time_start is not None
+        assert time_stop is not None
+        assert time_start == 0.0
+        assert time_stop == 1.0
+        assert elapsed == time_stop - time_start
         assert not stopwatch.is_running
-        assert stopwatch.time_stop == 1.0
 
     def test_reset(self, stopwatch: Stopwatch) -> None:
         """Test resetting the stopwatch."""
@@ -92,6 +101,14 @@ class TestInvalidLifecycleOperations:
 
     def test_stop_not_started(self, stopwatch: Stopwatch) -> None:
         """Test stopping a non-running stopwatch raises error."""
+        with pytest.raises(NotRunningError):
+            stopwatch.stop()
+
+    def test_stop_already_stopped(self, stopwatch: Stopwatch) -> None:
+        """Test stopping an already stopped stopwatch raises error."""
+        stopwatch.start()
+        stopwatch.stop()
+
         with pytest.raises(NotRunningError):
             stopwatch.stop()
 
