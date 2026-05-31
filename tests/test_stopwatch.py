@@ -185,20 +185,67 @@ class TestLapOperations:
 class TestElapsedTime:
     """Test total elapsed time property access."""
 
-    def test_time_elapsed_while_running(self, stopwatch: Stopwatch) -> None:
-        """Test getting elapsed time while running."""
-        stopwatch.start()  # time = 0.0
-        elapsed = stopwatch.time_elapsed  # time = 1.0
-        assert elapsed == 1.0
+    def test_running_returns_current_time_minus_start_time(self) -> None:
+        """Test running elapsed time is computed from the start time."""
+        timer = Mock(side_effect=[10.0, 13.0])
+        stopwatch = Stopwatch(timer_func=timer)
 
-    def test_time_elapsed_after_stop(self, stopwatch: Stopwatch) -> None:
-        """Test getting elapsed time after stopping."""
-        stopwatch.start()  # time = 0.0
-        stopwatch.stop()  # time = 1.0
-        elapsed = stopwatch.time_elapsed  # Should not call timer
-        assert elapsed == 1.0
+        stopwatch.start()
 
-    def test_time_elapsed_not_started(self, stopwatch: Stopwatch) -> None:
+        assert stopwatch.time_elapsed == 3.0
+
+    def test_running_reflects_each_timer_read(self) -> None:
+        """Test running elapsed time uses the current timer value."""
+        timer = Mock(side_effect=[10.0, 13.0, 18.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+
+        assert stopwatch.time_elapsed == 3.0
+        assert stopwatch.time_elapsed == 8.0
+
+    def test_stopped_returns_stop_time_minus_start_time(self) -> None:
+        """Test stopped elapsed time is computed from the stop time."""
+        timer = Mock(side_effect=[10.0, 13.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.stop()
+
+        assert stopwatch.time_elapsed == 3.0
+
+    def test_stopped_remains_fixed_across_reads(self) -> None:
+        """Test stopped elapsed time remains the same after stop."""
+        timer = Mock(side_effect=[10.0, 13.0, 18.0, 21.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.stop()
+
+        assert stopwatch.time_elapsed == 3.0
+        assert stopwatch.time_elapsed == 3.0
+
+    def test_stopped_does_not_depend_on_timer_after_stop(self) -> None:
+        """Test stopped elapsed time does not require further timer reads."""
+        timer = Mock(
+            side_effect=[
+                10.0,
+                13.0,
+                AssertionError("timer read after stop"),
+            ],
+        )
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.stop()
+
+        assert stopwatch.time_elapsed == 3.0
+        assert stopwatch.time_elapsed == 3.0
+
+    def test_not_started_raises_not_started_error(
+        self,
+        stopwatch: Stopwatch,
+    ) -> None:
         """Test getting elapsed time before starting raises error."""
         with pytest.raises(NotStartedError):
             _ = stopwatch.time_elapsed
