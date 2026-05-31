@@ -87,10 +87,15 @@ def stopwatch(
     def _create_wrapper(f: Callable[P, R]) -> Callable[P, R]:
         """Create the wrapper function for the given function."""
         if exit_callback is None:
+            callable_name = getattr(f, "__name__", None)
+            if not isinstance(callable_name, str):
+                callable_name = getattr(f, "__qualname__", None)
+            if not isinstance(callable_name, str):
+                callable_name = type(f).__name__
 
             def _default_callback(elapsed: float) -> None:
                 print(  # noqa: T201
-                    f"Function {f.__name__!r} exited "
+                    f"Function {callable_name!r} exited "
                     f"after {elapsed:.6f} seconds",
                 )
 

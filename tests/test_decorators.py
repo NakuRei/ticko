@@ -155,6 +155,28 @@ class TestStopwatchDecorator:
         assert "%r" not in output
         assert "%f" not in output
 
+    def test_default_callback_format_with_callable_object(
+        self,
+        mock_timer: Mock,
+    ) -> None:
+        """Test the default callback output for callable objects."""
+
+        class Work:
+            def __call__(self) -> str:
+                return "ok"
+
+        decorated = stopwatch(Work(), timer_func=mock_timer)
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            result = decorated()
+
+        output = f.getvalue()
+        assert result == "ok"
+        assert "'Work'" in output
+        assert "exited after" in output
+        assert "1.000000" in output
+
     def test_default_callback_format_with_exception(
         self,
         mock_timer: Mock,
