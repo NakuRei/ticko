@@ -130,6 +130,10 @@ For more examples, see the [`examples/`](examples/) directory.
 **Constructor:**
 - `Stopwatch(*, name=None, timer_func=time.perf_counter, exit_callback=None)` - Create a stopwatch with optional naming, custom timing, and stop callback
 
+When passing a custom `timer_func`, keep it fast and side-effect-light. The
+stopwatch may call it while holding its internal lock, so the timer function
+must not call methods or properties on the same `Stopwatch` instance.
+
 **Properties:**
 - `name: str | None` - Optional stopwatch name
 - `is_running: bool` - Current state

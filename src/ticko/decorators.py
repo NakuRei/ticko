@@ -53,7 +53,10 @@ def stopwatch(
     func : Callable[P, R] | None, optional
         The function to decorate. If None, returns a decorator function.
     timer_func : Callable[[], float], optional
-        Function returning the current time (default: time.perf_counter).
+        Function returning the current time (default: time.perf_counter). It
+        should be fast and side-effect-light. It may be called while the
+        stopwatch holds its internal lock, so it must not call methods or
+        properties on the same Stopwatch instance.
     exit_callback : Callable[[float], None] | None, optional
         Optional callback invoked with the elapsed time when the
         decorated function exits. If None, a default callback is used that

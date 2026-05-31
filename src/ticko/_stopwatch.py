@@ -45,7 +45,10 @@ class Stopwatch:
         Optional name for identifying this stopwatch in log messages and
         string representations (default: None).
     timer_func : Callable[[], float], optional
-        Function returning the current time (default: time.perf_counter).
+        Function returning the current time (default: time.perf_counter). It
+        should be fast and side-effect-light. It may be called while the
+        stopwatch holds its internal lock, so it must not call methods or
+        properties on the same Stopwatch instance.
     exit_callback : Callable[[float], None] | None, optional
         Optional callback invoked with the elapsed time when the
         stopwatch is stopped. If None, no callback is invoked.
@@ -116,6 +119,9 @@ class Stopwatch:
             string representations (default: None).
         timer_func : Callable[[], float], optional
             Function returning the current time (default: time.perf_counter).
+            It should be fast and side-effect-light. It may be called while
+            the stopwatch holds its internal lock, so it must not call methods
+            or properties on the same Stopwatch instance.
         exit_callback : Callable[[float], None] | None, optional
             Optional callback invoked with the elapsed time when the stopwatch
             is stopped.
