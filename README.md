@@ -158,6 +158,9 @@ By default, the decorator prints a human-readable timing message to stdout every
 time the decorated function exits. Use `exit_callback` when timing information
 should go to stderr, logging, metrics, or another destination.
 
+Works on both regular and `async def` functions. For an async function, timing
+covers the awaited body until it returns or raises.
+
 ## Development
 
 ```bash
