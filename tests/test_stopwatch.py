@@ -2,6 +2,7 @@
 
 import logging
 import time
+from typing import Literal
 from unittest.mock import Mock
 
 import pytest
@@ -436,6 +437,52 @@ class TestExitCallbacks:
         sw.stop()
         callback.assert_called_once_with(1.0)
 
+    @pytest.mark.parametrize(
+        "stop_failure_state",
+        ["not_started", "already_stopped"],
+    )
+    def test_exit_callback_not_called_when_stop_is_not_running(
+        self,
+        mock_timer: Mock,
+        stop_failure_state: Literal["not_started", "already_stopped"],
+    ) -> None:
+        """Test exit callback is not called when stop() fails."""
+        callback = Mock()
+        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+
+        if stop_failure_state == "already_stopped":
+            sw.start()
+            sw.stop()
+            callback.reset_mock()
+
+        with pytest.raises(NotRunningError):
+            sw.stop()
+
+        callback.assert_not_called()
+
+    def test_exit_callback_not_called_when_stop_timer_fails(self) -> None:
+        """Test exit callback is not called when stop() cannot read time."""
+        timer = Mock(side_effect=[0.0, RuntimeError("timer error")])
+        callback = Mock()
+        sw = Stopwatch(timer_func=timer, exit_callback=callback)
+        sw.start()
+
+        with pytest.raises(RuntimeError, match="timer error"):
+            sw.stop()
+
+        callback.assert_not_called()
+
+    def test_exit_callback_not_called_on_reset_before_start(
+        self, mock_timer: Mock
+    ) -> None:
+        """Test exit callback is not called on reset() before start()."""
+        callback = Mock()
+        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+
+        sw.reset()
+
+        callback.assert_not_called()
+
     def test_exit_callback_not_called_on_reset_while_running(
         self, mock_timer: Mock
     ) -> None:
@@ -446,14 +493,39 @@ class TestExitCallbacks:
         sw.reset()
         callback.assert_not_called()
 
-    def test_exit_callback_with_exception(self, mock_timer: Mock) -> None:
+    def test_exit_callback_not_called_on_reset_after_stop(
+        self, mock_timer: Mock
+    ) -> None:
+        """Test exit callback is not called on reset() after stop()."""
+        callback = Mock()
+        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+        sw.start()
+        sw.stop()
+        callback.reset_mock()
+
+        sw.reset()
+
+        callback.assert_not_called()
+
+    def test_exit_callback_with_exception(
+        self, mock_timer: Mock, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test exit callback that raises exception is handled."""
         callback = Mock(side_effect=RuntimeError("Callback error"))
         sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
         sw.start()
-        # Should not raise, exception should be logged
-        sw.stop()
-        callback.assert_called_once()
+        with caplog.at_level(logging.ERROR, logger="ticko"):
+            elapsed = sw.stop()
+
+        assert elapsed == 1.0
+        callback.assert_called_once_with(1.0)
+        assert any(
+            record.levelno >= logging.ERROR
+            and (record.name == "ticko" or record.name.startswith("ticko."))
+            and record.exc_info is not None
+            and isinstance(record.exc_info[1], RuntimeError)
+            for record in caplog.records
+        )
 
 
 class TestTimerFunction:
