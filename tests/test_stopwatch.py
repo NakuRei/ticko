@@ -13,6 +13,7 @@ from ticko import (
     NotRunningError,
     NotStartedError,
     Stopwatch,
+    StopwatchError,
 )
 
 
@@ -35,6 +36,26 @@ def repr_contract_timer() -> float:
 
 def repr_contract_callback(_elapsed: float) -> None:
     """Accept elapsed time for repr contract tests."""
+
+
+class TestStopwatchExceptionHierarchy:
+    """Test public Stopwatch exception relationships."""
+
+    @pytest.mark.parametrize(
+        "specific_error",
+        [
+            AlreadyRunningError,
+            NotRunningError,
+            NotStartedError,
+            NoLapsRecordedError,
+        ],
+    )
+    def test_specific_errors_are_stopwatch_errors(
+        self,
+        specific_error: type[StopwatchError],
+    ) -> None:
+        """Test specific Stopwatch errors can be caught as StopwatchError."""
+        assert issubclass(specific_error, StopwatchError)
 
 
 class TestLifecycleOperations:
