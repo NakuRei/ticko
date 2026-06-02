@@ -101,6 +101,34 @@ class TestLifecycleOperations:
         assert not stopwatch.is_running
         assert stopwatch.time_start is None
         assert stopwatch.time_stop is None
+        with pytest.raises(NotStartedError):
+            _ = stopwatch.time_elapsed
+        with pytest.raises(NoLapsRecordedError):
+            _ = stopwatch.time_since_last_lap
+
+    def test_reset_while_running_discards_measurement_and_allows_restart(
+        self, mock_timer: Mock
+    ) -> None:
+        """Test running reset() discards state without calling callback."""
+        callback = Mock()
+        stopwatch = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+
+        stopwatch.start()
+        stopwatch.lap()
+        stopwatch.reset()
+
+        assert not stopwatch.is_running
+        assert stopwatch.time_start is None
+        assert stopwatch.time_stop is None
+        with pytest.raises(NotStartedError):
+            _ = stopwatch.time_elapsed
+        with pytest.raises(NoLapsRecordedError):
+            _ = stopwatch.time_since_last_lap
+        callback.assert_not_called()
+
+        stopwatch.start()
+        elapsed_after_restart = stopwatch.stop()
+        assert elapsed_after_restart == 1.0
 
     def test_start_after_reset(self, stopwatch: Stopwatch) -> None:
         """Test start() after reset()."""
