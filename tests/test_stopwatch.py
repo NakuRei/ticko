@@ -334,6 +334,25 @@ class TestLapElapsedTime:
         last_lap = stopwatch.time_since_last_lap  # Should not call timer
         assert last_lap == 1.0
 
+    def test_stopped_time_since_last_lap_does_not_read_timer(self) -> None:
+        """Test stopped lap elapsed time does not read the timer."""
+        timer = Mock(
+            side_effect=[
+                10.0,
+                13.0,
+                17.0,
+                AssertionError("timer read after stop"),
+            ],
+        )
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.lap()
+        stopwatch.stop()
+
+        assert stopwatch.time_since_last_lap == 4.0
+        assert stopwatch.time_since_last_lap == 4.0
+
     def test_time_since_last_lap_after_stop_uses_most_recent_lap(
         self,
     ) -> None:
