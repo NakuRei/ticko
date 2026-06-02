@@ -540,6 +540,23 @@ class TestTimerFunction:
         assert elapsed == 10.0
         assert custom_timer.call_count == 2
 
+    def test_custom_timer_values_are_exposed_as_raw_timestamps(
+        self,
+    ) -> None:
+        """Test custom timer values are exposed as raw timestamps."""
+        custom_timer = Mock(side_effect=[1000.0, 1003.5])
+        sw = Stopwatch(timer_func=custom_timer)
+
+        sw.start()
+        assert sw.time_start == 1000.0
+
+        elapsed = sw.stop()
+
+        assert sw.time_start == 1000.0
+        assert sw.time_stop == 1003.5
+        assert elapsed == 3.5
+        assert sw.time_elapsed == 3.5
+
 
 class TestNameOption:
     """Test Stopwatch name parameter."""
