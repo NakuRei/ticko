@@ -413,6 +413,20 @@ class TestContextManager:
             assert sw is stopwatch
         assert not stopwatch.is_running
 
+    def test_nested_same_context_manager_raises_already_running(
+        self,
+        stopwatch: Stopwatch,
+    ) -> None:
+        """Test nesting the same stopwatch context manager raises error."""
+        with (
+            pytest.raises(AlreadyRunningError),
+            stopwatch,
+            stopwatch,
+        ):
+            pass
+
+        assert not stopwatch.is_running
+
     def test_context_manager_with_exception(self, stopwatch: Stopwatch) -> None:
         """Test context manager stops even on exception."""
         with (  # noqa: PT012
