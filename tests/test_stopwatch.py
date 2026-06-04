@@ -429,12 +429,15 @@ class TestContextManager:
 
     def test_context_manager_with_exception(self, stopwatch: Stopwatch) -> None:
         """Test context manager stops even on exception."""
-        with (  # noqa: PT012
-            pytest.raises(ValueError, match="Test exception"),
-            stopwatch,
-        ):
-            assert stopwatch.is_running
-            raise ValueError("Test exception")
+
+        def _raise_while_stopwatch_running() -> None:
+            with stopwatch:
+                assert stopwatch.is_running
+                raise ValueError("Test exception")
+
+        with pytest.raises(ValueError, match="Test exception"):
+            _raise_while_stopwatch_running()
+
         assert not stopwatch.is_running
         assert stopwatch.time_stop is not None
 
