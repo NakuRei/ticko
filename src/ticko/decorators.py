@@ -97,6 +97,7 @@ def stopwatch(
                 callable_name = type(f).__name__
 
             def _default_callback(elapsed: float) -> None:
+                # Default callback intentionally writes timing output to stdout.
                 print(  # noqa: T201
                     f"Function {callable_name!r} exited "
                     f"after {elapsed:.6f} seconds",
