@@ -138,6 +138,7 @@ class Stopwatch:
         self._time_stop: float | None = None
         self._is_running: bool = False
         self._lap_recorded: bool = False
+        self._lap_durations: list[float] = []
 
         self._lock = threading.Lock()  # For thread safety
 
@@ -214,6 +215,12 @@ class Stopwatch:
             )
             raise AssertionError(msg)
 
+    @property
+    def laps(self) -> tuple[float, ...]:
+        """Get the recorded lap durations in the order they were recorded."""
+        with self._lock:
+            return tuple(self._lap_durations)
+
     def reset(self) -> None:
         """Reset the stopwatch to its initial state.
 
@@ -229,6 +236,7 @@ class Stopwatch:
             self._time_stop = None
             self._is_running = False
             self._lap_recorded = False
+            self._lap_durations.clear()
             logger.debug("%s has been reset.", self._log_name)
 
     def start(self) -> None:
@@ -245,6 +253,7 @@ class Stopwatch:
             self._time_last_lap_start = time_current
             self._time_stop = None
             self._lap_recorded = False
+            self._lap_durations.clear()
             self._is_running = True
             logger.debug("%s started at %f.", self._log_name, time_current)
 
@@ -267,6 +276,7 @@ class Stopwatch:
             lap_duration: Final = time_current - self._time_last_lap_start
             self._time_last_lap_start = time_current
             self._lap_recorded = True
+            self._lap_durations.append(lap_duration)
             logger.debug(
                 "%s lap recorded at %f with duration %f.",
                 self._log_name,
@@ -290,10 +300,19 @@ class Stopwatch:
                 )
                 raise AssertionError(msg)
 
+            if self._time_last_lap_start is None:
+                msg = (  # pragma: no cover
+                    "Invariant: _time_last_lap_start is None while running."
+                )
+                raise AssertionError(msg)
+
             time_current: Final = self._timer_func()
             self._time_stop = time_current
             # Directly compute to avoid multiple calls of with self._lock
             time_elapsed: Final = self._time_stop - self._time_start
+            self._lap_durations.append(
+                self._time_stop - self._time_last_lap_start
+            )
             self._is_running = False
             logger.debug(
                 "%s stopped at %f with elapsed time %f.",

@@ -324,6 +324,73 @@ class TestThreadSafety:
         for lap_time in lap_times:
             assert_non_negative_number(lap_time)
 
+    def test_concurrent_laps_history_length_matches_lap_count(self) -> None:
+        """Concurrent lap() calls should record one history entry each."""
+        sw = make_stopwatch()
+        sw.start()
+
+        worker_failures: list[Exception] = []
+        worker_failures_lock = threading.Lock()
+        barrier = threading.Barrier(4, timeout=_THREAD_TIMEOUT)
+
+        def record_laps() -> None:
+            try:
+                barrier.wait()
+                for _ in range(10):
+                    sw.lap()
+            except Exception as exc:
+                with worker_failures_lock:
+                    worker_failures.append(exc)
+
+        threads = [threading.Thread(target=record_laps) for _ in range(3)]
+        for thread in threads:
+            thread.start()
+
+        try:
+            barrier.wait()
+        except threading.BrokenBarrierError as exc:  # pragma: no cover
+            pytest.fail(f"Failed to start concurrent lap workers: {exc}")
+
+        for thread in threads:
+            thread.join(timeout=_THREAD_TIMEOUT)
+
+        still_running = [thread.name for thread in threads if thread.is_alive()]
+        assert not still_running, f"Threads did not finish: {still_running}"
+        assert not worker_failures, (
+            f"Unexpected worker failures: {worker_failures}"
+        )
+
+        laps = sw.laps
+        assert len(laps) == 30
+        for lap_duration in laps:
+            assert_non_negative_number(lap_duration)
+
+    def test_laps_snapshot_is_consistent_under_concurrent_mutation(
+        self,
+    ) -> None:
+        """Reading laps while lap() runs should yield a clean snapshot."""
+        sw = make_stopwatch()
+        sw.start()
+
+        def reader() -> list[tuple[float, ...]]:
+            return [sw.laps for _ in range(20)]
+
+        outcomes = run_concurrently(
+            reader,
+            *(sw.lap for _ in range(15)),
+        )
+
+        snapshots = assert_returned(outcomes[0])
+        for snapshot in snapshots:
+            assert isinstance(snapshot, tuple)
+            for lap_duration in snapshot:
+                assert_non_negative_number(lap_duration)
+
+        for lap_outcome in outcomes[1:]:
+            assert_non_negative_number(assert_returned(lap_outcome))
+
+        assert len(sw.laps) == 15
+
     def test_concurrent_start_attempts(self) -> None:
         """Only one concurrent start() should succeed on a shared stopwatch."""
         sw = make_stopwatch()

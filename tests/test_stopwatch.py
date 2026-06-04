@@ -403,6 +403,185 @@ class TestLapElapsedTime:
             _ = stopwatch.time_since_last_lap
 
 
+class TestLapHistory:
+    """Test the recorded lap duration history."""
+
+    def test_laps_returns_recorded_durations_in_order(self) -> None:
+        """Test laps returns each lap duration in recording order."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0, 6.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.lap()  # time = 3.0
+        stopwatch.lap()  # time = 6.0
+
+        assert stopwatch.laps == (1.0, 2.0, 3.0)
+
+    def test_laps_is_empty_before_start(self, stopwatch: Stopwatch) -> None:
+        """Test laps is empty before the stopwatch is started."""
+        assert stopwatch.laps == ()
+
+    def test_laps_is_empty_while_running_without_lap(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test laps is empty while running with no recorded lap."""
+        stopwatch.start()
+        assert stopwatch.laps == ()
+
+    def test_lap_appends_one_duration(self) -> None:
+        """Test a single lap() records exactly one duration."""
+        timer = Mock(side_effect=[0.0, 4.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 4.0
+
+        assert stopwatch.laps == (4.0,)
+
+    def test_lap_records_interval_from_previous_boundary(self) -> None:
+        """Test each recorded lap measures from the previous boundary."""
+        timer = Mock(side_effect=[10.0, 11.0, 13.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 10.0
+        stopwatch.lap()  # time = 11.0
+        stopwatch.lap()  # time = 13.0
+
+        assert stopwatch.laps == (1.0, 2.0)
+
+    def test_start_clears_lap_history(self) -> None:
+        """Test start() clears history from the previous session."""
+        timer = Mock(side_effect=[0.0, 1.0, 2.0, 3.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.stop()  # time = 2.0
+        stopwatch.start()  # time = 3.0
+
+        assert stopwatch.laps == ()
+
+    def test_reset_clears_lap_history(self) -> None:
+        """Test reset() clears the recorded history."""
+        timer = Mock(side_effect=[0.0, 1.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.reset()
+
+        assert stopwatch.laps == ()
+
+    def test_laps_returns_immutable_snapshot(self) -> None:
+        """Test a returned laps snapshot is unaffected by later laps."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        snapshot = stopwatch.laps
+        stopwatch.lap()  # time = 3.0
+
+        assert snapshot == (1.0,)
+
+    def test_lap_on_not_running_leaves_history_unchanged(self) -> None:
+        """Test a failed lap() does not alter a non-empty history."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.stop()  # time = 3.0
+        history_before = stopwatch.laps
+
+        with pytest.raises(NotRunningError):
+            stopwatch.lap()
+
+        assert stopwatch.laps == history_before
+        assert stopwatch.laps == (1.0, 2.0)
+
+
+class TestStopFinalSegment:
+    """Test the final segment recorded when the stopwatch is stopped."""
+
+    def test_stop_appends_final_segment_to_history(self) -> None:
+        """Test stop() appends the last lap-to-stop interval to history."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0, 6.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.lap()  # time = 3.0
+        stopwatch.stop()  # time = 6.0
+
+        assert stopwatch.laps == (1.0, 2.0, 3.0)
+
+    def test_stop_without_lap_records_single_total_segment(self) -> None:
+        """Test stop() without any lap records one segment of total time."""
+        timer = Mock(side_effect=[10.0, 14.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 10.0
+        stopwatch.stop()  # time = 14.0
+
+        assert stopwatch.laps == (4.0,)
+
+    def test_lap_durations_sum_equals_elapsed_after_stop(self) -> None:
+        """Test the sum of recorded durations equals the total elapsed time."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0, 6.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.lap()  # time = 3.0
+        elapsed = stopwatch.stop()  # time = 6.0
+
+        assert sum(stopwatch.laps) == elapsed
+        assert sum(stopwatch.laps) == stopwatch.time_elapsed
+
+    def test_stop_on_not_running_leaves_history_unchanged(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test a stop() on a not-running stopwatch does not touch history."""
+        with pytest.raises(NotRunningError):
+            stopwatch.stop()
+
+        assert stopwatch.laps == ()
+
+    def test_stop_does_not_append_when_stop_time_unavailable(self) -> None:
+        """Test a failing stop() timer read leaves history and state intact."""
+        timer = Mock(side_effect=[0.0, 1.0, RuntimeError("timer failed")])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+
+        with pytest.raises(RuntimeError):
+            stopwatch.stop()  # timer raises
+
+        assert stopwatch.is_running
+        assert stopwatch.laps == (1.0,)
+
+    def test_stop_on_not_running_with_history_leaves_history_unchanged(
+        self,
+    ) -> None:
+        """Test a failed stop() does not alter an already recorded history."""
+        timer = Mock(side_effect=[0.0, 1.0, 3.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.stop()  # time = 3.0
+        history_before = stopwatch.laps
+
+        with pytest.raises(NotRunningError):
+            stopwatch.stop()
+
+        assert stopwatch.laps == history_before
+        assert stopwatch.laps == (1.0, 2.0)
+
+
 class TestContextManager:
     """Test context manager functionality."""
 
