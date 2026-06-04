@@ -2,7 +2,6 @@
 
 import logging
 import time
-from typing import Literal
 from unittest.mock import Mock
 
 import pytest
@@ -701,23 +700,27 @@ class TestExitCallbacks:
         sw.stop()
         callback.assert_called_once_with(1.0)
 
-    @pytest.mark.parametrize(
-        "stop_failure_state",
-        ["not_started", "already_stopped"],
-    )
-    def test_exit_callback_not_called_when_stop_is_not_running(
-        self,
-        mock_timer: Mock,
-        stop_failure_state: Literal["not_started", "already_stopped"],
+    def test_exit_callback_not_called_when_stop_not_started(
+        self, mock_timer: Mock
     ) -> None:
-        """Test exit callback is not called when stop() fails."""
+        """Test exit callback is not called when stop() before start()."""
         callback = Mock()
         sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
 
-        if stop_failure_state == "already_stopped":
-            sw.start()
+        with pytest.raises(NotRunningError):
             sw.stop()
-            callback.reset_mock()
+
+        callback.assert_not_called()
+
+    def test_exit_callback_not_called_when_stop_already_stopped(
+        self, mock_timer: Mock
+    ) -> None:
+        """Test exit callback is not called when stop() after stop()."""
+        callback = Mock()
+        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+        sw.start()
+        sw.stop()
+        callback.reset_mock()
 
         with pytest.raises(NotRunningError):
             sw.stop()
