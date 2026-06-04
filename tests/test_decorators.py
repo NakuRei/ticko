@@ -2,6 +2,7 @@
 
 import asyncio
 import io
+import logging
 import time
 from contextlib import redirect_stdout
 from unittest.mock import Mock
@@ -146,6 +147,34 @@ class TestExitCallbackTiming:
 
         callback.assert_called_once()
         assert isinstance(callback.call_args[0][0], float)
+
+    def test_decorator_preserves_exception_when_stop_timer_fails(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test stop timer failure does not replace function exception."""
+        timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
+        callback = Mock()
+
+        @stopwatch(timer_func=timer, exit_callback=callback)
+        def failing_func() -> None:
+            raise ValueError("body failed")
+
+        with (
+            caplog.at_level(logging.ERROR, logger="ticko"),
+            pytest.raises(ValueError, match="body failed"),
+        ):
+            failing_func()
+
+        callback.assert_not_called()
+        assert any(
+            record.levelno >= logging.ERROR
+            and (record.name == "ticko" or record.name.startswith("ticko."))
+            and record.exc_info is not None
+            and isinstance(record.exc_info[1], RuntimeError)
+            and str(record.exc_info[1]) == "timer failed"
+            for record in caplog.records
+        )
 
 
 class TestDefaultCallbackOutput:
@@ -317,3 +346,32 @@ class TestAsyncWrappedFunctions:
             asyncio.run(failing_func())
 
         assert events == ["body-start", "body-error", "callback:1.0"]
+
+    def test_async_function_preserves_exception_when_stop_timer_fails(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test async stop timer failure does not replace body exception."""
+        timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
+        callback = Mock()
+
+        @stopwatch(timer_func=timer, exit_callback=callback)
+        async def failing_func() -> None:
+            await asyncio.sleep(0)
+            raise ValueError("async body failed")
+
+        with (
+            caplog.at_level(logging.ERROR, logger="ticko"),
+            pytest.raises(ValueError, match="async body failed"),
+        ):
+            asyncio.run(failing_func())
+
+        callback.assert_not_called()
+        assert any(
+            record.levelno >= logging.ERROR
+            and (record.name == "ticko" or record.name.startswith("ticko."))
+            and record.exc_info is not None
+            and isinstance(record.exc_info[1], RuntimeError)
+            and str(record.exc_info[1]) == "timer failed"
+            for record in caplog.records
+        )

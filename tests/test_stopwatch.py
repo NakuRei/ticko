@@ -461,6 +461,55 @@ class TestContextManager:
         with pytest.raises(ValueError, match="early stop"):
             _trigger()
 
+    def test_context_manager_preserves_exception_when_stop_timer_fails(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test stop timer failure does not replace block exception."""
+        timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
+        callback = Mock()
+        stopwatch = Stopwatch(timer_func=timer, exit_callback=callback)
+
+        def _trigger() -> None:
+            with stopwatch:
+                raise ValueError("body failed")
+
+        with (
+            caplog.at_level(logging.ERROR, logger="ticko"),
+            pytest.raises(ValueError, match="body failed"),
+        ):
+            _trigger()
+
+        callback.assert_not_called()
+        assert stopwatch.is_running
+        assert stopwatch.time_stop is None
+        assert any(
+            record.levelno >= logging.ERROR
+            and (record.name == "ticko" or record.name.startswith("ticko."))
+            and record.exc_info is not None
+            and isinstance(record.exc_info[1], RuntimeError)
+            and str(record.exc_info[1]) == "timer failed"
+            for record in caplog.records
+        )
+
+    def test_context_manager_raises_stop_failure_without_active_exception(
+        self,
+    ) -> None:
+        """Test context manager raises stop failure without block exception."""
+        timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
+        callback = Mock()
+        stopwatch = Stopwatch(timer_func=timer, exit_callback=callback)
+
+        with (
+            pytest.raises(RuntimeError, match="timer failed"),
+            stopwatch,
+        ):
+            pass
+
+        callback.assert_not_called()
+        assert stopwatch.is_running
+        assert stopwatch.time_stop is None
+
 
 class TestExitCallbacks:
     """Test callback functionality."""
@@ -507,6 +556,8 @@ class TestExitCallbacks:
             sw.stop()
 
         callback.assert_not_called()
+        assert sw.is_running
+        assert sw.time_stop is None
 
     def test_exit_callback_not_called_on_reset_before_start(
         self, mock_timer: Mock

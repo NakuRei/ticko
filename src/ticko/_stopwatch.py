@@ -1,6 +1,5 @@
 """Thread-safe stopwatch for measuring elapsed time."""
 
-import contextlib
 import logging
 import threading
 import time
@@ -389,6 +388,25 @@ class Stopwatch:
 
         If the stopwatch was already stopped before the context exits,
         this method does nothing to avoid raising NotRunningError.
+        If the context exits with an exception, stop failures are logged
+        without replacing the original exception.
         """
-        with contextlib.suppress(NotRunningError):
-            self.stop()
+        stop_for_exception_cleanup(self, exc_type, exc_value, traceback)
+
+
+def stop_for_exception_cleanup(
+    stopwatch: Stopwatch,
+    exc_type: type[BaseException] | None,
+    exc_value: BaseException | None,
+    traceback: TracebackType | None,
+) -> None:
+    """Stop from decorator or context manager cleanup."""
+    del exc_value, traceback
+    try:
+        stopwatch.stop()
+    except NotRunningError:
+        pass
+    except Exception:
+        if exc_type is None:
+            raise
+        logger.exception("Stopwatch stop failed during exception cleanup")

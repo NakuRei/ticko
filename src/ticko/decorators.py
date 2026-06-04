@@ -2,11 +2,12 @@
 
 import functools
 import inspect
+import sys
 import time
 from collections.abc import Awaitable, Callable
 from typing import ParamSpec, TypeVar, cast, overload
 
-from ._stopwatch import Stopwatch
+from ._stopwatch import Stopwatch, stop_for_exception_cleanup
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -69,10 +70,11 @@ def stopwatch(
 
     Notes
     -----
-    The Stopwatch is stopped regardless of whether the decorated function
-    returns normally or raises an exception. If an exception occurs it is
-    re-raised after the stopwatch has been stopped; exit_callback is still
-    invoked.
+    The Stopwatch is stopped when the decorated function exits normally. It
+    is also stopped when the decorated function raises, and the original
+    exception is re-raised after successful cleanup. If stopping fails while
+    preserving that exception, the stop failure is logged, the original
+    exception is re-raised, and exit_callback is not invoked.
 
     When applied to an async function, timing includes the awaited function
     body until it returns or raises. When applied to a synchronous function
@@ -122,7 +124,7 @@ def stopwatch(
                 try:
                     return await async_func(*args, **kwargs)
                 finally:
-                    sw.stop()
+                    stop_for_exception_cleanup(sw, *sys.exc_info())
 
             return cast("Callable[P, R]", async_wrapper)
 
@@ -133,7 +135,7 @@ def stopwatch(
             try:
                 return f(*args, **kwargs)
             finally:
-                sw.stop()
+                stop_for_exception_cleanup(sw, *sys.exc_info())
 
         return wrapper
 
