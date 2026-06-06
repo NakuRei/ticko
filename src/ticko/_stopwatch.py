@@ -95,10 +95,10 @@ class Stopwatch:
     >>> sw.time_elapsed
     3.0
     >>> sw.reset()
-    >>> sw.time_elapsed  # doctest: +ELLIPSIS
+    >>> sw.time_elapsed  # doctest: +IGNORE_EXCEPTION_DETAIL
     Traceback (most recent call last):
         ...
-    ticko._stopwatch.NotStartedError: ...
+    NotStartedError: ...
 
     """
 
