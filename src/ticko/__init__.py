@@ -57,6 +57,8 @@ Using Stopwatch as a context manager:
 
 """
 
+import logging
+
 from ._stopwatch import (
     AlreadyRunningError,
     NoLapsRecordedError,
@@ -66,6 +68,13 @@ from ._stopwatch import (
     StopwatchError,
 )
 from .decorators import stopwatch
+
+_package_logger = logging.getLogger(__name__)
+if not any(
+    isinstance(handler, logging.NullHandler)
+    for handler in _package_logger.handlers
+):
+    _package_logger.addHandler(logging.NullHandler())
 
 __all__ = [
     "AlreadyRunningError",

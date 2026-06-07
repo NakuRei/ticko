@@ -38,6 +38,19 @@ def repr_contract_callback(_elapsed: float) -> None:
     """Accept elapsed time for repr contract tests."""
 
 
+class DiagnosticRecordHandler(logging.Handler):
+    """Collect application-observed diagnostic log records."""
+
+    def __init__(self) -> None:
+        """Initialize the record collection handler."""
+        super().__init__(level=logging.ERROR)
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Store an emitted log record."""
+        self.records.append(record)
+
+
 class TestStopwatchExceptionHierarchy:
     """Test public Stopwatch exception relationships."""
 
@@ -670,6 +683,29 @@ class TestContextManager:
             for record in caplog.records
         )
 
+    def test_exception_cleanup_failure_stderr_is_silent_by_default(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test cleanup diagnostics stay silent without application logging."""
+        root_logger = logging.getLogger()
+        previous_handlers = root_logger.handlers[:]
+        try:
+            root_logger.handlers.clear()
+            timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
+            stopwatch = Stopwatch(timer_func=timer)
+
+            with (
+                pytest.raises(ValueError, match="body failed"),
+                stopwatch,
+            ):
+                raise ValueError("body failed")
+
+            captured = capsys.readouterr()
+            assert captured.err == ""
+        finally:
+            root_logger.handlers[:] = previous_handlers
+
     def test_context_manager_raises_stop_failure_without_active_exception(
         self,
     ) -> None:
@@ -794,6 +830,61 @@ class TestExitCallbacks:
             and record.exc_info is not None
             and isinstance(record.exc_info[1], RuntimeError)
             for record in caplog.records
+        )
+
+    def test_exit_callback_exception_stderr_is_silent_by_default(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test unconfigured applications do not receive stderr logs."""
+
+        def raise_callback(_elapsed: float) -> None:
+            raise RuntimeError("callback failed")
+
+        root_logger = logging.getLogger()
+        previous_handlers = root_logger.handlers[:]
+        try:
+            root_logger.handlers.clear()
+            timer_values = iter([0.0, 1.0])
+            sw = Stopwatch(
+                timer_func=timer_values.__next__,
+                exit_callback=raise_callback,
+            )
+
+            sw.start()
+            assert sw.stop() == 1.0
+            captured = capsys.readouterr()
+            assert captured.err == ""
+        finally:
+            root_logger.handlers[:] = previous_handlers
+
+    def test_exit_callback_exception_reaches_application_handler(
+        self,
+        mock_timer: Mock,
+    ) -> None:
+        """Test application-owned ticko handlers receive diagnostics."""
+        callback = Mock(side_effect=RuntimeError("Callback error"))
+        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+        handler = DiagnosticRecordHandler()
+        ticko_logger = logging.getLogger("ticko")
+        previous_level = ticko_logger.level
+
+        sw.start()
+        ticko_logger.addHandler(handler)
+        ticko_logger.setLevel(logging.ERROR)
+        try:
+            elapsed = sw.stop()
+        finally:
+            ticko_logger.removeHandler(handler)
+            ticko_logger.setLevel(previous_level)
+
+        assert elapsed == 1.0
+        assert any(
+            record.levelno >= logging.ERROR
+            and (record.name == "ticko" or record.name.startswith("ticko."))
+            and record.exc_info is not None
+            and isinstance(record.exc_info[1], RuntimeError)
+            for record in handler.records
         )
 
 
