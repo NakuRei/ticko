@@ -8,8 +8,10 @@ import pytest
 from _timing_output_assertions import assert_elapsed_seconds_displayed
 
 from ticko import (
+    AlreadyPausedError,
     AlreadyRunningError,
     NoLapsRecordedError,
+    NotPausedError,
     NotRunningError,
     NotStartedError,
     Stopwatch,
@@ -61,6 +63,8 @@ class TestStopwatchExceptionHierarchy:
             NotRunningError,
             NotStartedError,
             NoLapsRecordedError,
+            AlreadyPausedError,
+            NotPausedError,
         ],
     )
     def test_specific_errors_are_stopwatch_errors(
@@ -1121,3 +1125,316 @@ class TestRealTimeMeasurement:
 
         assert lap1 > 0.04
         assert lap2 > 0.04
+
+
+class TestPauseResume:
+    """Test pause/resume measurement behavior."""
+
+    def test_pause_freezes_elapsed_and_clears_running(self) -> None:
+        """Test pause() stops elapsed from advancing and clears running."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0, 9.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.pause()  # time = 2.0
+
+        assert not stopwatch.is_running
+        assert stopwatch.time_elapsed == 2.0  # frozen, no timer read
+        assert stopwatch.time_elapsed == 2.0
+
+    def test_resume_restores_running_and_continues_measuring(self) -> None:
+        """Test resume() restores running and measurement continues."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0, 8.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.pause()  # time = 2.0
+        stopwatch.resume()  # time = 5.0
+
+        assert stopwatch.is_running
+        assert stopwatch.time_elapsed == 5.0  # time = 8.0, active = 8-5+2
+
+    def test_time_elapsed_excludes_paused_interval(self) -> None:
+        """Test time_elapsed excludes the pause interval."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0, 9.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.pause()  # time = 2.0, active = 2.0
+        stopwatch.resume()  # time = 5.0, paused interval = 3.0
+
+        # time = 9.0; active = (9 - 5) + 2 = 6, paused 3.0 excluded
+        assert stopwatch.time_elapsed == 6.0
+
+    def test_stop_return_excludes_paused_interval(self) -> None:
+        """Test stop() return value excludes the pause interval."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0, 9.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.pause()  # time = 2.0
+        stopwatch.resume()  # time = 5.0
+        elapsed = stopwatch.stop()  # time = 9.0
+
+        assert elapsed == 6.0
+        assert stopwatch.time_elapsed == 6.0
+
+    def test_time_since_last_lap_excludes_paused_interval(self) -> None:
+        """Test time_since_last_lap excludes a pause after the last lap."""
+        timer = Mock(side_effect=[0.0, 1.0, 4.0, 7.0, 11.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.pause()  # time = 4.0, active since lap = 3.0
+        stopwatch.resume()  # time = 7.0, paused interval = 3.0
+
+        # time = 11.0; active since lap = (11 - 7) + 3 = 7
+        assert stopwatch.time_since_last_lap == 7.0
+
+    def test_time_since_last_lap_frozen_while_paused(self) -> None:
+        """Test time_since_last_lap is frozen while paused."""
+        timer = Mock(side_effect=[0.0, 1.0, 4.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.pause()  # time = 4.0, active since lap = 3.0
+
+        # Read while still paused: frozen, no further timer call.
+        assert stopwatch.time_since_last_lap == 3.0
+        assert stopwatch.time_since_last_lap == 3.0
+
+    def test_laps_sum_equals_elapsed_with_pause(self) -> None:
+        """Test sum(laps) equals time_elapsed across a pause."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0, 7.0, 11.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 2.0
+        stopwatch.pause()  # time = 5.0
+        stopwatch.resume()  # time = 7.0, paused interval = 2.0
+        elapsed = stopwatch.stop()  # time = 11.0
+
+        assert sum(stopwatch.laps) == elapsed
+        assert sum(stopwatch.laps) == stopwatch.time_elapsed
+
+    def test_elapsed_excludes_all_pause_intervals(self) -> None:
+        """Test elapsed excludes every pause across multiple cycles."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0, 8.0, 12.0, 15.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # t=0
+        stopwatch.pause()  # t=2, active 2
+        stopwatch.resume()  # t=5, paused 3
+        stopwatch.pause()  # t=8, active +3 = 5
+        stopwatch.resume()  # t=12, paused 4
+        elapsed = stopwatch.stop()  # t=15, active +3 = 8
+
+        # Both pauses (3 + 4) excluded; active total is 2 + 3 + 3 = 8.
+        assert elapsed == 8.0
+        assert stopwatch.time_elapsed == 8.0
+        assert sum(stopwatch.laps) == 8.0
+
+    def test_lap_after_resume_excludes_paused_interval(self) -> None:
+        """Test a lap() spanning a pause excludes the paused interval."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0, 9.0, 12.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # t=0
+        stopwatch.lap()  # t=2, first segment = 2
+        stopwatch.pause()  # t=5
+        stopwatch.resume()  # t=9, paused 4
+        second_lap = stopwatch.lap()  # t=12, active since lap = 3 + 3 = 6
+
+        assert second_lap == 6.0
+
+    def test_reset_clears_paused_state(self) -> None:
+        """Test reset() from paused returns to the not-started state."""
+        timer = Mock(side_effect=[0.0, 2.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.pause()  # time = 2.0
+        stopwatch.reset()
+
+        assert not stopwatch.is_running
+        assert stopwatch.time_start is None
+        assert stopwatch.time_stop is None
+        assert stopwatch.laps == ()
+        with pytest.raises(NotStartedError):
+            _ = stopwatch.time_elapsed
+
+
+class TestPauseResumeStr:
+    """Test __str__ while paused."""
+
+    def test_str_paused_reports_paused_without_raising(self) -> None:
+        """Test str() of a paused stopwatch reports a pause-excluded time."""
+        timer = Mock(side_effect=[0.0, 2.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.pause()  # time = 2.0
+        result = str(stopwatch)
+
+        assert "Stopwatch" in result
+        assert "paused" in result
+        assert_elapsed_seconds_displayed(result, 2.0)
+
+
+class TestPauseResumeErrors:
+    """Test degenerate transitions involving pause/resume."""
+
+    def test_double_pause_raises_already_paused(self) -> None:
+        """Test pause() while paused raises AlreadyPausedError."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.pause()
+
+        with pytest.raises(AlreadyPausedError):
+            stopwatch.pause()
+        assert not stopwatch.is_running
+        assert stopwatch.time_elapsed == 2.0
+        # Still paused (not stopped), so resume must succeed.
+        stopwatch.resume()
+        assert stopwatch.is_running
+
+    def test_start_while_paused_raises_already_paused(self) -> None:
+        """Test start() while paused raises AlreadyPausedError."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.pause()
+
+        with pytest.raises(AlreadyPausedError):
+            stopwatch.start()
+        assert not stopwatch.is_running
+        assert stopwatch.time_elapsed == 2.0
+        # Still paused (not stopped), so resume must succeed.
+        stopwatch.resume()
+        assert stopwatch.is_running
+
+    def test_lap_while_paused_raises_already_paused(self) -> None:
+        """Test lap() while paused raises AlreadyPausedError."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.pause()
+
+        with pytest.raises(AlreadyPausedError):
+            stopwatch.lap()
+        assert not stopwatch.is_running
+        assert stopwatch.time_elapsed == 2.0
+        # Still paused (not stopped), so resume must succeed.
+        stopwatch.resume()
+        assert stopwatch.is_running
+
+    def test_stop_while_paused_raises_already_paused(self) -> None:
+        """Test stop() while paused raises AlreadyPausedError."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.pause()
+
+        with pytest.raises(AlreadyPausedError):
+            stopwatch.stop()
+        assert not stopwatch.is_running
+        assert stopwatch.time_elapsed == 2.0
+        # Still paused (not stopped), so resume must succeed.
+        stopwatch.resume()
+        assert stopwatch.is_running
+
+    def test_resume_not_started_raises_not_paused(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test resume() before start raises NotPausedError."""
+        with pytest.raises(NotPausedError):
+            stopwatch.resume()
+        # State preserved: still not-started.
+        assert not stopwatch.is_running
+        with pytest.raises(NotStartedError):
+            _ = stopwatch.time_elapsed
+
+    def test_resume_while_running_raises_not_paused(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test resume() while running raises NotPausedError."""
+        stopwatch.start()
+        with pytest.raises(NotPausedError):
+            stopwatch.resume()
+        assert stopwatch.is_running
+
+    def test_resume_after_stop_raises_not_paused(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test resume() after stop raises NotPausedError."""
+        stopwatch.start()
+        stopwatch.stop()
+        elapsed_before = stopwatch.time_elapsed
+        with pytest.raises(NotPausedError):
+            stopwatch.resume()
+        # State preserved: still stopped with unchanged elapsed.
+        assert not stopwatch.is_running
+        assert stopwatch.time_elapsed == elapsed_before
+
+    def test_pause_not_started_raises_not_running(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test pause() before start raises NotRunningError."""
+        with pytest.raises(NotRunningError):
+            stopwatch.pause()
+        # State preserved: still not-started.
+        assert not stopwatch.is_running
+        with pytest.raises(NotStartedError):
+            _ = stopwatch.time_elapsed
+
+    def test_pause_after_stop_raises_not_running(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test pause() after stop raises NotRunningError."""
+        stopwatch.start()
+        stopwatch.stop()
+        elapsed_before = stopwatch.time_elapsed
+        with pytest.raises(NotRunningError):
+            stopwatch.pause()
+        # State preserved: still stopped with unchanged elapsed.
+        assert not stopwatch.is_running
+        assert stopwatch.time_elapsed == elapsed_before
+
+
+class TestPauseExitCallback:
+    """Test exit_callback interaction with pause/resume."""
+
+    def test_pause_does_not_invoke_exit_callback(
+        self, mock_timer: Mock
+    ) -> None:
+        """Test pause() does not invoke exit_callback."""
+        callback = Mock()
+        stopwatch = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+
+        stopwatch.start()
+        stopwatch.pause()
+
+        callback.assert_not_called()
+
+    def test_context_manager_exit_finalizes_paused_watch(self) -> None:
+        """Test exiting a context manager while paused stops and reports."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0])
+        callback = Mock()
+        stopwatch = Stopwatch(timer_func=timer, exit_callback=callback)
+
+        with stopwatch:  # start, time = 0.0
+            stopwatch.pause()  # time = 2.0
+
+        assert not stopwatch.is_running
+        assert stopwatch.time_stop is not None
+        assert stopwatch.time_elapsed == 2.0
+        with pytest.raises(NotPausedError):
+            stopwatch.resume()
+        callback.assert_called_once_with(2.0)

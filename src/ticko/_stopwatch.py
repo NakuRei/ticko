@@ -19,7 +19,18 @@ class AlreadyRunningError(StopwatchError):
 
 
 class NotRunningError(StopwatchError):
-    """Raised when stop() or lap() is called while not running."""
+    """Raised when stop(), lap(), or pause() is called while not running."""
+
+
+class AlreadyPausedError(StopwatchError):
+    """Raised when an operation is blocked because the stopwatch is paused.
+
+    Covers start(), pause(), lap(), and stop() while paused.
+    """
+
+
+class NotPausedError(StopwatchError):
+    """Raised when resume() is called while the stopwatch is not paused."""
 
 
 class NotStartedError(StopwatchError):
@@ -34,9 +45,9 @@ class NoLapsRecordedError(StopwatchError):
 class Stopwatch:
     """Thread-safe stopwatch for measuring elapsed time.
 
-    This class provides methods to start, stop, lap, and reset a stopwatch. It
-    is designed to be thread-safe, allowing safe usage in multi-threaded
-    environments.
+    This class provides methods to start, pause, resume, stop, lap, and reset
+    a stopwatch. It is designed to be thread-safe, allowing safe usage in
+    multi-threaded environments.
 
     Parameters
     ----------
@@ -59,10 +70,12 @@ class Stopwatch:
     is_running : bool
         Indicates whether the stopwatch is currently running.
     time_start : float | None
-        The raw ``timer_func()`` value recorded at ``start()``, or None if not
-        started. Its absolute value depends on the ``timer_func`` used (e.g.
-        a Unix timestamp when using ``time.time``, an arbitrary epoch when
-        using the default ``time.perf_counter``).
+        The raw ``timer_func()`` value marking the effective measurement
+        start, or None if not started. After a ``pause()`` / ``resume()`` it
+        is shifted forward by the paused duration so that ``time_elapsed``
+        excludes paused intervals. Its absolute value depends on the
+        ``timer_func`` used (e.g. a Unix timestamp when using ``time.time``,
+        an arbitrary epoch when using the default ``time.perf_counter``).
     time_stop : float | None
         The raw ``timer_func()`` value recorded at ``stop()``, or None if not
         stopped. Same caveat as ``time_start`` regarding absolute value.
@@ -76,6 +89,10 @@ class Stopwatch:
     -------
     start() -> None
         Start the stopwatch.
+    pause() -> None
+        Pause the stopwatch, excluding the paused interval from elapsed time.
+    resume() -> None
+        Resume a paused stopwatch.
     lap() -> float
         Record a lap time.
     stop() -> float
@@ -136,7 +153,9 @@ class Stopwatch:
         self._time_start: float | None = None
         self._time_last_lap_start: float | None = None
         self._time_stop: float | None = None
+        self._time_paused: float | None = None
         self._is_running: bool = False
+        self._is_paused: bool = False
         self._lap_recorded: bool = False
         self._lap_durations: list[float] = []
 
@@ -155,9 +174,11 @@ class Stopwatch:
 
     @property
     def time_start(self) -> float | None:
-        """Get the raw timer_func() value recorded at start().
+        """Get the raw timer_func() value marking the effective start.
 
-        Returns None if the stopwatch has not been started. The absolute value
+        Returns None if the stopwatch has not been started. After a
+        pause()/resume(), this value is shifted forward by the paused duration
+        so that time_elapsed excludes paused intervals. The absolute value
         depends on the timer_func used; compare only against other timestamps
         from the same stopwatch instance.
         """
@@ -168,9 +189,10 @@ class Stopwatch:
     def time_stop(self) -> float | None:
         """Get the raw timer_func() value recorded at stop().
 
-        Returns None if the stopwatch has not been stopped. The absolute value
-        depends on the timer_func used; compare only against other timestamps
-        from the same stopwatch instance.
+        Returns None if the stopwatch has not been stopped (including while
+        paused, which is not a stopped state). The absolute value depends on the
+        timer_func used; compare only against other timestamps from the same
+        stopwatch instance.
         """
         with self._lock:
             return self._time_stop
@@ -188,6 +210,8 @@ class Stopwatch:
 
             if self._is_running:
                 return self._timer_func() - self._time_start
+            if self._is_paused and self._time_paused is not None:
+                return self._time_paused - self._time_start
             if self._time_stop is not None:
                 return self._time_stop - self._time_start
             msg = (  # pragma: no cover
@@ -208,6 +232,8 @@ class Stopwatch:
 
             if self._is_running:
                 return self._timer_func() - self._time_last_lap_start
+            if self._is_paused and self._time_paused is not None:
+                return self._time_paused - self._time_last_lap_start
             if self._time_stop is not None:
                 return self._time_stop - self._time_last_lap_start
             msg = (  # pragma: no cover
@@ -234,7 +260,9 @@ class Stopwatch:
             self._time_start = None
             self._time_last_lap_start = None
             self._time_stop = None
+            self._time_paused = None
             self._is_running = False
+            self._is_paused = False
             self._lap_recorded = False
             self._lap_durations.clear()
             logger.debug("%s has been reset.", self._log_name)
@@ -242,6 +270,12 @@ class Stopwatch:
     def start(self) -> None:
         """Start the stopwatch."""
         with self._lock:
+            if self._is_paused:
+                msg = (
+                    "Stopwatch is paused. "
+                    "Call resume() or reset() before starting again."
+                )
+                raise AlreadyPausedError(msg)
             if self._is_running:
                 msg = (
                     "Stopwatch is already running. "
@@ -252,14 +286,93 @@ class Stopwatch:
             self._time_start = time_current
             self._time_last_lap_start = time_current
             self._time_stop = None
+            self._time_paused = None
+            self._is_paused = False
             self._lap_recorded = False
             self._lap_durations.clear()
             self._is_running = True
             logger.debug("%s started at %f.", self._log_name, time_current)
 
+    def pause(self) -> None:
+        """Pause the stopwatch.
+
+        Freezes the elapsed time at the current active measurement so that the
+        interval until ``resume()`` is excluded from the reported time. After
+        pause, ``is_running`` returns False. ``exit_callback`` is not invoked,
+        since pause is not the end of a measurement.
+
+        Raises
+        ------
+        AlreadyPausedError
+            If the stopwatch is already paused.
+        NotRunningError
+            If the stopwatch is not running (not started or stopped).
+        """
+        with self._lock:
+            if self._is_paused:
+                msg = (
+                    "Stopwatch is already paused. "
+                    "Call resume() before pausing again."
+                )
+                raise AlreadyPausedError(msg)
+            if not self._is_running:
+                msg = (
+                    "Stopwatch is not running. "
+                    "Call start() first before pausing."
+                )
+                raise NotRunningError(msg)
+
+            time_current: Final = self._timer_func()
+            self._time_paused = time_current
+            self._is_running = False
+            self._is_paused = True
+            logger.debug("%s paused at %f.", self._log_name, time_current)
+
+    def resume(self) -> None:
+        """Resume a paused stopwatch.
+
+        Restarts measurement from the value frozen at ``pause()``; the paused
+        interval is not counted. After resume, ``is_running`` returns True.
+
+        Raises
+        ------
+        NotPausedError
+            If the stopwatch is not currently paused.
+        """
+        with self._lock:
+            if not self._is_paused:
+                msg = "Stopwatch is not paused. Call pause() before resuming."
+                raise NotPausedError(msg)
+            if self._time_paused is None or self._time_start is None:
+                msg = (  # pragma: no cover
+                    "Invariant: _time_paused and _time_start must be set "
+                    "while paused."
+                )
+                raise AssertionError(msg)
+
+            time_current: Final = self._timer_func()
+            pause_duration: Final = time_current - self._time_paused
+            self._time_start += pause_duration
+            if self._time_last_lap_start is not None:
+                self._time_last_lap_start += pause_duration
+            self._time_paused = None
+            self._is_paused = False
+            self._is_running = True
+            logger.debug(
+                "%s resumed at %f after %f paused.",
+                self._log_name,
+                time_current,
+                pause_duration,
+            )
+
     def lap(self) -> float:
         """Record a lap time."""
         with self._lock:
+            if self._is_paused:
+                msg = (
+                    "Stopwatch is paused. Call resume() before recording a lap."
+                )
+                raise AlreadyPausedError(msg)
             if not self._is_running:
                 msg = (
                     "Stopwatch is not running. "
@@ -288,6 +401,9 @@ class Stopwatch:
     def stop(self) -> float:
         """Stop the stopwatch."""
         with self._lock:
+            if self._is_paused:
+                msg = "Stopwatch is paused. Call resume() before stopping."
+                raise AlreadyPausedError(msg)
             if not self._is_running:
                 msg = (
                     "Stopwatch is not running. "
@@ -330,6 +446,54 @@ class Stopwatch:
                 logger.exception("Exit callback raised an exception")
 
         return time_elapsed
+
+    def _finalize_paused_for_cleanup(self) -> bool:
+        """Finalize a paused stopwatch on context-manager cleanup.
+
+        Converts a paused stopwatch to stopped using the pause-excluded
+        elapsed time frozen at ``pause()`` and invokes ``exit_callback``.
+        Used only by ``__exit__``; direct ``stop()`` on a paused stopwatch
+        remains strict and raises ``AlreadyPausedError``.
+
+        Returns
+        -------
+        bool
+            True if the stopwatch was paused and has been finalized; False if
+            it was not paused, in which case no state was changed.
+        """
+        with self._lock:
+            if not self._is_paused:
+                return False
+            if (
+                self._time_paused is None
+                or self._time_start is None
+                or self._time_last_lap_start is None
+            ):
+                msg = (  # pragma: no cover
+                    "Invariant: _time_paused, _time_start and "
+                    "_time_last_lap_start must be set while paused."
+                )
+                raise AssertionError(msg)
+
+            time_elapsed: Final = self._time_paused - self._time_start
+            self._lap_durations.append(
+                self._time_paused - self._time_last_lap_start
+            )
+            self._time_stop = self._time_paused
+            self._time_paused = None
+            self._is_paused = False
+            logger.debug(
+                "%s finalized from paused with elapsed time %f.",
+                self._log_name,
+                time_elapsed,
+            )
+
+        if self._exit_callback is not None:
+            try:
+                self._exit_callback(time_elapsed)
+            except Exception:
+                logger.exception("Exit callback raised an exception")
+        return True
 
     def __repr__(self) -> str:
         """Return a string representation for recreating the Stopwatch.
@@ -386,6 +550,9 @@ class Stopwatch:
             if self._is_running:
                 elapsed = self._timer_func() - self._time_start
                 return f"Stopwatch({name_part}running, elapsed={elapsed:.6f}s)"
+            if self._is_paused and self._time_paused is not None:
+                elapsed = self._time_paused - self._time_start
+                return f"Stopwatch({name_part}paused, elapsed={elapsed:.6f}s)"
             if self._time_stop is not None:
                 elapsed = self._time_stop - self._time_start
                 return f"Stopwatch({name_part}stopped, elapsed={elapsed:.6f}s)"
@@ -407,9 +574,16 @@ class Stopwatch:
 
         If the stopwatch was already stopped before the context exits,
         this method does nothing to avoid raising NotRunningError.
+        A paused stopwatch is finalized on exit (stopped with the
+        pause-excluded elapsed) and ``exit_callback`` fires.
         If the context exits with an exception, stop failures are logged
         without replacing the original exception.
         """
+        # A paused watch only reaches cleanup through `__exit__`, so it is
+        # finalized here (self-access), not in the shared cleanup helper
+        # below, which decorators also use (their watch is never paused).
+        if self._finalize_paused_for_cleanup():
+            return
         stop_for_exception_cleanup(self, exc_type, exc_value, traceback)
 
 

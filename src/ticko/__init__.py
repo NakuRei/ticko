@@ -7,14 +7,18 @@ decorator for automatically measuring function execution times.
 Classes
 -------
 Stopwatch
-    Thread-safe stopwatch for measuring elapsed time with start, stop, lap,
-    and reset functionality.
+    Thread-safe stopwatch for measuring elapsed time with start, pause, resume,
+    stop, lap, and reset functionality.
 StopwatchError
     Base class for all Stopwatch exceptions.
 AlreadyRunningError
     Raised when trying to start an already running stopwatch.
 NotRunningError
-    Raised when stop() or lap() is called while the stopwatch is not running.
+    Raised when stop(), lap(), or pause() is called while not running.
+AlreadyPausedError
+    Raised when start(), pause(), lap(), or stop() is called while paused.
+NotPausedError
+    Raised when resume() is called while the stopwatch is not paused.
 NotStartedError
     Raised when accessing time_elapsed before start() has ever been called.
 NoLapsRecordedError
@@ -60,8 +64,10 @@ Using Stopwatch as a context manager:
 import logging
 
 from ._stopwatch import (
+    AlreadyPausedError,
     AlreadyRunningError,
     NoLapsRecordedError,
+    NotPausedError,
     NotRunningError,
     NotStartedError,
     Stopwatch,
@@ -77,8 +83,10 @@ if not any(
     _package_logger.addHandler(logging.NullHandler())
 
 __all__ = [
+    "AlreadyPausedError",
     "AlreadyRunningError",
     "NoLapsRecordedError",
+    "NotPausedError",
     "NotRunningError",
     "NotStartedError",
     "Stopwatch",

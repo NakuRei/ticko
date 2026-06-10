@@ -8,8 +8,10 @@ from typing import Any
 import pytest
 
 from ticko import (
+    AlreadyPausedError,
     AlreadyRunningError,
     NoLapsRecordedError,
+    NotPausedError,
     NotRunningError,
     NotStartedError,
     Stopwatch,
@@ -543,6 +545,66 @@ class TestThreadSafety:
             thread.join()
 
         assert len(callback_calls) == 10
+
+    def test_concurrent_pause_attempts(self) -> None:
+        """Only one concurrent pause() should succeed on a running stopwatch."""
+        sw = make_stopwatch()
+        sw.start()
+        outcomes = run_concurrently(*(sw.pause for _ in range(10)))
+
+        success_count = sum(
+            1 for outcome in outcomes if outcome == ("return", None)
+        )
+        error_count = sum(
+            1
+            for outcome in outcomes
+            if outcome[0] == "raise"
+            and isinstance(outcome[1], AlreadyPausedError)
+        )
+
+        assert success_count == 1
+        assert error_count == 9
+        assert not sw.is_running
+        assert sw.time_start is not None
+
+    def test_concurrent_resume_attempts(self) -> None:
+        """Only one concurrent resume() should succeed on a paused stopwatch."""
+        sw = make_stopwatch()
+        sw.start()
+        sw.pause()
+        outcomes = run_concurrently(*(sw.resume for _ in range(10)))
+
+        success_count = sum(
+            1 for outcome in outcomes if outcome == ("return", None)
+        )
+        error_count = sum(
+            1
+            for outcome in outcomes
+            if outcome[0] == "raise" and isinstance(outcome[1], NotPausedError)
+        )
+
+        assert success_count == 1
+        assert error_count == 9
+        assert sw.is_running
+
+    def test_pause_and_resume_race(self) -> None:
+        """pause() and resume() should expose only legal public outcomes."""
+        sw = make_stopwatch()
+        sw.start()
+        pause_outcome, resume_outcome = run_concurrently(sw.pause, sw.resume)
+
+        # pause() always sees a running stopwatch (resume() never stops it),
+        # so it succeeds. resume() succeeds only if it ran after pause().
+        assert pause_outcome == ("return", None)
+
+        if resume_outcome[0] == "return":
+            assert resume_outcome[1] is None
+            assert sw.is_running
+        else:
+            assert_raised(resume_outcome, NotPausedError)
+            assert not sw.is_running
+
+        assert sw.time_start is not None
 
 
 class TestBehaviorUnderLoad:
