@@ -48,6 +48,19 @@ process_data()  # Prints execution time to stdout by default
 
 ## Core Features
 
+### Context Managers
+
+```python
+with Stopwatch() as sw:
+    # ... your code ...
+    pass
+
+print(f"Elapsed: {sw.time_elapsed:.3f}s")
+```
+
+The context manager starts timing on entry and stops on exit. If the block
+raises an exception, the original exception is preserved.
+
 ### Manual Control
 
 ```python
@@ -56,6 +69,25 @@ sw.start()
 # ... your code ...
 elapsed = sw.stop()
 ```
+
+### Pause and Resume
+
+```python
+sw = Stopwatch()
+sw.start()
+
+# ... active work ...
+sw.pause()
+# ... waiting or setup that should not count ...
+sw.resume()
+# ... more active work ...
+
+elapsed = sw.stop()
+```
+
+Paused intervals are excluded from `time_elapsed`. Calling `stop()` directly
+while paused raises `AlreadyPausedError`; call `resume()` before `stop()`, or
+use a context manager to finalize a paused stopwatch when the context exits.
 
 ### Lap Timing
 
@@ -70,7 +102,44 @@ lap2 = sw.lap()
 elapsed = sw.stop()
 ```
 
+The full history of recorded lap durations is available through the `laps`
+property, which returns an immutable tuple in recording order. Each `lap()`
+appends the duration since the previous lap (or since `start()` for the first
+one), and `stop()` appends the final segment from the last lap (or from
+`start()` if none) to the stop time. The durations therefore sum to
+`time_elapsed`. The tuple is empty until the first `lap()` or `stop()` records a
+duration, so a `start()` -> `stop()` with no `lap()` in between yields a single
+duration equal to `time_elapsed`. `start()` and `reset()` clear the history.
+
+```python
+sw = Stopwatch()
+sw.start()
+sw.lap()
+sw.lap()
+sw.stop()
+
+print(sw.laps)  # Recorded lap durations, including the final stop segment
+```
+
+### Decorator Timing
+
+```python
+@stopwatch
+def load_data() -> list[str]:
+    return ["alpha", "beta", "gamma"]
+
+
+load_data()
+```
+
+The decorator prints elapsed time to stdout by default. Pass `exit_callback` to
+send elapsed seconds to logging, metrics, stderr, or another destination.
+
 ### Custom Callbacks
+
+`Stopwatch` and `@stopwatch` accept an `exit_callback` with the signature
+`Callable[[float], None]`. The callback receives elapsed seconds when timing
+finishes.
 
 `@stopwatch` prints a human-readable timing message to stdout by default. This
 is useful for scripts, examples, and interactive use where immediate feedback is
@@ -85,6 +154,15 @@ def report_time(elapsed: float) -> None:
     print(f"Execution took {elapsed:.3f}s", file=sys.stderr)
 
 
+sw = Stopwatch(exit_callback=report_time)
+sw.start()
+# ... your code ...
+sw.stop()
+```
+
+The same callback form works with the decorator:
+
+```python
 @stopwatch(exit_callback=report_time)
 def my_function():
     pass
@@ -143,23 +221,50 @@ must not call methods or properties on the same `Stopwatch` instance.
 - `time_stop: float | None` - Raw timer value recorded at stop
 - `time_elapsed: float` - Total elapsed time
 - `time_since_last_lap: float` - Elapsed time since the last lap marker
+- `laps: tuple[float, ...]` - Recorded lap durations in recording order (empty until the first `lap()` or `stop()`)
 
 **Methods:**
-- `start()` - Start timing
-- `stop()` - Stop and return elapsed time
-- `lap()` - Record lap time
-- `reset()` - Reset to initial state
+- `start()` - Start timing and return `None`
+- `pause()` - Pause timing and exclude the paused interval from elapsed time
+- `resume()` - Resume a paused stopwatch
+- `stop()` - Stop, call `exit_callback` when configured, and return elapsed time
+- `lap()` - Record and return lap duration
+- `reset()` - Reset to initial state without calling `exit_callback`
+
+**Exceptions:**
+- `StopwatchError` - Base class for stopwatch exceptions
+- `AlreadyRunningError` - Raised when starting an already running stopwatch
+- `NotRunningError` - Raised when stopping, lapping, or pausing a stopwatch that is not running
+- `AlreadyPausedError` - Raised when an operation is blocked because the stopwatch is paused
+- `NotPausedError` - Raised when resuming a stopwatch that is not paused
+- `NotStartedError` - Raised when reading elapsed time before the first start
+- `NoLapsRecordedError` - Raised when reading lap elapsed time before any lap
 
 ### `@stopwatch`
 
 Decorator for quick, visible function timing.
 
 By default, the decorator prints a human-readable timing message to stdout every
-time the decorated function exits. Use `exit_callback` when timing information
-should go to stderr, logging, metrics, or another destination.
+time the decorated function exits. The output includes the callable name and
+elapsed seconds. Use `exit_callback` when timing information should go to
+stderr, logging, metrics, or another destination.
 
-Works on both regular and `async def` functions. For an async function, timing
-covers the awaited body until it returns or raises.
+Works on regular functions, callable objects, `async def` functions, and
+callable objects whose `__call__` is async. For async callables, timing covers
+the awaited body until it returns or raises.
+
+When a synchronous function returns an awaitable object, timing ends when that
+object is returned. Awaiting or consuming that object is not measured.
+
+## Migrating from 1.x
+
+- Rename `StopWatch` to `Stopwatch`
+- Rename `StopWatchError` to `StopwatchError`
+- Import from `ticko`; `ticko.stop_watch` is no longer supported
+- Update `exit_callback` functions to accept elapsed seconds as `float`, not a stopwatch instance
+- Do not rely on `start()` returning the start time; it now returns `None`
+- Rename `time_last_lap` to `time_since_last_lap`
+- Remove uses of `time_last_lap_start` and `InvalidStateError`
 
 ## Development
 
