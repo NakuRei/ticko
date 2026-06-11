@@ -225,7 +225,7 @@ class Stopwatch:
         with self._lock:
             if not self._lap_recorded or self._time_last_lap_start is None:
                 msg = (
-                    "No laps have been recorded. "
+                    "lap() has not been called. "
                     "Call lap() after starting the stopwatch."
                 )
                 raise NoLapsRecordedError(msg)
