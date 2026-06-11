@@ -289,39 +289,15 @@ class TestThreadSafety:
         sw = make_stopwatch()
         sw.start()
 
-        lap_times: list[float] = []
-        lap_times_lock = threading.Lock()
-        worker_failures: list[Exception] = []
-        worker_failures_lock = threading.Lock()
-        barrier = threading.Barrier(4, timeout=_THREAD_TIMEOUT)
+        def record_laps() -> list[float]:
+            return [sw.lap() for _ in range(10)]
 
-        def record_laps() -> None:
-            try:
-                barrier.wait()
-                local_laps = [sw.lap() for _ in range(10)]
-                with lap_times_lock:
-                    lap_times.extend(local_laps)
-            except Exception as exc:
-                with worker_failures_lock:
-                    worker_failures.append(exc)
-
-        threads = [threading.Thread(target=record_laps) for _ in range(3)]
-        for thread in threads:
-            thread.start()
-
-        try:
-            barrier.wait()
-        except threading.BrokenBarrierError as exc:  # pragma: no cover
-            pytest.fail(f"Failed to start concurrent lap workers: {exc}")
-
-        for thread in threads:
-            thread.join(timeout=_THREAD_TIMEOUT)
-
-        still_running = [thread.name for thread in threads if thread.is_alive()]
-        assert not still_running, f"Threads did not finish: {still_running}"
-        assert not worker_failures, (
-            f"Unexpected worker failures: {worker_failures}"
-        )
+        outcomes = run_concurrently(*(record_laps for _ in range(3)))
+        lap_times = [
+            lap_time
+            for outcome in outcomes
+            for lap_time in assert_returned(outcome)
+        ]
         assert len(lap_times) == 30
         for lap_time in lap_times:
             assert_non_negative_number(lap_time)
@@ -331,36 +307,13 @@ class TestThreadSafety:
         sw = make_stopwatch()
         sw.start()
 
-        worker_failures: list[Exception] = []
-        worker_failures_lock = threading.Lock()
-        barrier = threading.Barrier(4, timeout=_THREAD_TIMEOUT)
-
         def record_laps() -> None:
-            try:
-                barrier.wait()
-                for _ in range(10):
-                    sw.lap()
-            except Exception as exc:
-                with worker_failures_lock:
-                    worker_failures.append(exc)
+            for _ in range(10):
+                sw.lap()
 
-        threads = [threading.Thread(target=record_laps) for _ in range(3)]
-        for thread in threads:
-            thread.start()
-
-        try:
-            barrier.wait()
-        except threading.BrokenBarrierError as exc:  # pragma: no cover
-            pytest.fail(f"Failed to start concurrent lap workers: {exc}")
-
-        for thread in threads:
-            thread.join(timeout=_THREAD_TIMEOUT)
-
-        still_running = [thread.name for thread in threads if thread.is_alive()]
-        assert not still_running, f"Threads did not finish: {still_running}"
-        assert not worker_failures, (
-            f"Unexpected worker failures: {worker_failures}"
-        )
+        outcomes = run_concurrently(*(record_laps for _ in range(3)))
+        for outcome in outcomes:
+            assert assert_returned(outcome) is None
 
         laps = sw.laps
         assert len(laps) == 30

@@ -2,6 +2,8 @@
 
 import logging
 import time
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager
 from unittest.mock import Mock
 
 import pytest
@@ -20,15 +22,29 @@ from ticko import (
 
 
 @pytest.fixture
-def mock_timer() -> Mock:
-    """Create a mock timer function."""
-    return Mock(side_effect=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
-
-
-@pytest.fixture
 def stopwatch(mock_timer: Mock) -> Stopwatch:
     """Create a Stopwatch instance with mock timer."""
     return Stopwatch(timer_func=mock_timer)
+
+
+@pytest.fixture
+def root_logger_without_handlers() -> Callable[
+    [],
+    AbstractContextManager[logging.Logger],
+]:
+    """Create a context manager that clears root logger handlers."""
+
+    @contextmanager
+    def clear_root_logger_handlers() -> Iterator[logging.Logger]:
+        root_logger = logging.getLogger()
+        previous_handlers = root_logger.handlers[:]
+        root_logger.handlers.clear()
+        try:
+            yield root_logger
+        finally:
+            root_logger.handlers[:] = previous_handlers
+
+    return clear_root_logger_handlers
 
 
 def repr_contract_timer() -> float:
@@ -690,25 +706,25 @@ class TestContextManager:
     def test_exception_cleanup_failure_stderr_is_silent_by_default(
         self,
         capsys: pytest.CaptureFixture[str],
+        root_logger_without_handlers: Callable[
+            [],
+            AbstractContextManager[logging.Logger],
+        ],
     ) -> None:
         """Test cleanup diagnostics stay silent without application logging."""
-        root_logger = logging.getLogger()
-        previous_handlers = root_logger.handlers[:]
-        try:
-            root_logger.handlers.clear()
-            timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
-            stopwatch = Stopwatch(timer_func=timer)
+        timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
+        stopwatch = Stopwatch(timer_func=timer)
 
+        with root_logger_without_handlers() as root_logger:
+            assert root_logger.handlers == []
             with (
                 pytest.raises(ValueError, match="body failed"),
                 stopwatch,
             ):
                 raise ValueError("body failed")
 
-            captured = capsys.readouterr()
-            assert captured.err == ""
-        finally:
-            root_logger.handlers[:] = previous_handlers
+        captured = capsys.readouterr()
+        assert captured.err == ""
 
     def test_context_manager_raises_stop_failure_without_active_exception(
         self,
@@ -732,40 +748,58 @@ class TestContextManager:
 class TestExitCallbacks:
     """Test callback functionality."""
 
-    def test_exit_callback(self, mock_timer: Mock) -> None:
+    @pytest.fixture
+    def exit_callback_mock(self) -> Mock:
+        """Create an exit callback mock."""
+        return Mock()
+
+    @pytest.fixture
+    def stopwatch_with_exit_callback(
+        self,
+        mock_timer: Mock,
+        exit_callback_mock: Mock,
+    ) -> Stopwatch:
+        """Create a stopwatch with a mock exit callback."""
+        return Stopwatch(
+            timer_func=mock_timer,
+            exit_callback=exit_callback_mock,
+        )
+
+    def test_exit_callback(
+        self,
+        stopwatch_with_exit_callback: Stopwatch,
+        exit_callback_mock: Mock,
+    ) -> None:
         """Test exit callback is called when stopping."""
-        callback = Mock()
-        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
-        sw.start()
-        sw.stop()
-        callback.assert_called_once_with(1.0)
+        stopwatch_with_exit_callback.start()
+        stopwatch_with_exit_callback.stop()
+        exit_callback_mock.assert_called_once_with(1.0)
 
     def test_exit_callback_not_called_when_stop_not_started(
-        self, mock_timer: Mock
+        self,
+        stopwatch_with_exit_callback: Stopwatch,
+        exit_callback_mock: Mock,
     ) -> None:
         """Test exit callback is not called when stop() before start()."""
-        callback = Mock()
-        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
-
         with pytest.raises(NotRunningError):
-            sw.stop()
+            stopwatch_with_exit_callback.stop()
 
-        callback.assert_not_called()
+        exit_callback_mock.assert_not_called()
 
     def test_exit_callback_not_called_when_stop_already_stopped(
-        self, mock_timer: Mock
+        self,
+        stopwatch_with_exit_callback: Stopwatch,
+        exit_callback_mock: Mock,
     ) -> None:
         """Test exit callback is not called when stop() after stop()."""
-        callback = Mock()
-        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
-        sw.start()
-        sw.stop()
-        callback.reset_mock()
+        stopwatch_with_exit_callback.start()
+        stopwatch_with_exit_callback.stop()
+        exit_callback_mock.reset_mock()
 
         with pytest.raises(NotRunningError):
-            sw.stop()
+            stopwatch_with_exit_callback.stop()
 
-        callback.assert_not_called()
+        exit_callback_mock.assert_not_called()
 
     def test_exit_callback_not_called_when_stop_timer_fails(self) -> None:
         """Test exit callback is not called when stop() cannot read time."""
@@ -782,39 +816,38 @@ class TestExitCallbacks:
         assert sw.time_stop is None
 
     def test_exit_callback_not_called_on_reset_before_start(
-        self, mock_timer: Mock
+        self,
+        stopwatch_with_exit_callback: Stopwatch,
+        exit_callback_mock: Mock,
     ) -> None:
         """Test exit callback is not called on reset() before start()."""
-        callback = Mock()
-        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
+        stopwatch_with_exit_callback.reset()
 
-        sw.reset()
-
-        callback.assert_not_called()
+        exit_callback_mock.assert_not_called()
 
     def test_exit_callback_not_called_on_reset_while_running(
-        self, mock_timer: Mock
+        self,
+        stopwatch_with_exit_callback: Stopwatch,
+        exit_callback_mock: Mock,
     ) -> None:
         """Test exit callback is not called on reset() while running."""
-        callback = Mock()
-        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
-        sw.start()
-        sw.reset()
-        callback.assert_not_called()
+        stopwatch_with_exit_callback.start()
+        stopwatch_with_exit_callback.reset()
+        exit_callback_mock.assert_not_called()
 
     def test_exit_callback_not_called_on_reset_after_stop(
-        self, mock_timer: Mock
+        self,
+        stopwatch_with_exit_callback: Stopwatch,
+        exit_callback_mock: Mock,
     ) -> None:
         """Test exit callback is not called on reset() after stop()."""
-        callback = Mock()
-        sw = Stopwatch(timer_func=mock_timer, exit_callback=callback)
-        sw.start()
-        sw.stop()
-        callback.reset_mock()
+        stopwatch_with_exit_callback.start()
+        stopwatch_with_exit_callback.stop()
+        exit_callback_mock.reset_mock()
 
-        sw.reset()
+        stopwatch_with_exit_callback.reset()
 
-        callback.assert_not_called()
+        exit_callback_mock.assert_not_called()
 
     def test_exit_callback_with_exception(
         self, mock_timer: Mock, caplog: pytest.LogCaptureFixture
@@ -839,28 +872,29 @@ class TestExitCallbacks:
     def test_exit_callback_exception_stderr_is_silent_by_default(
         self,
         capsys: pytest.CaptureFixture[str],
+        root_logger_without_handlers: Callable[
+            [],
+            AbstractContextManager[logging.Logger],
+        ],
     ) -> None:
         """Test unconfigured applications do not receive stderr logs."""
 
         def raise_callback(_elapsed: float) -> None:
             raise RuntimeError("callback failed")
 
-        root_logger = logging.getLogger()
-        previous_handlers = root_logger.handlers[:]
-        try:
-            root_logger.handlers.clear()
-            timer_values = iter([0.0, 1.0])
-            sw = Stopwatch(
-                timer_func=timer_values.__next__,
-                exit_callback=raise_callback,
-            )
+        timer_values = iter([0.0, 1.0])
+        sw = Stopwatch(
+            timer_func=timer_values.__next__,
+            exit_callback=raise_callback,
+        )
 
+        with root_logger_without_handlers() as root_logger:
+            assert root_logger.handlers == []
             sw.start()
             assert sw.stop() == 1.0
-            captured = capsys.readouterr()
-            assert captured.err == ""
-        finally:
-            root_logger.handlers[:] = previous_handlers
+
+        captured = capsys.readouterr()
+        assert captured.err == ""
 
     def test_exit_callback_exception_reaches_application_handler(
         self,
@@ -1011,11 +1045,12 @@ class TestRepr:
             """Return the next state-transition timer value."""
             return next(timer_values)
 
-        state_timer.__module__ = "test_module"
-        state_timer.__qualname__ = "state_timer"
         sw = Stopwatch(timer_func=state_timer)
+        expected_timer_name = (
+            f"{state_timer.__module__}.{state_timer.__qualname__}"
+        )
         expected = (
-            "Stopwatch(timer_func=test_module.state_timer, exit_callback=None)"
+            f"Stopwatch(timer_func={expected_timer_name}, exit_callback=None)"
         )
 
         repr_not_started = repr(sw)
@@ -1286,69 +1321,39 @@ class TestPauseResumeStr:
 class TestPauseResumeErrors:
     """Test degenerate transitions involving pause/resume."""
 
-    def test_double_pause_raises_already_paused(self) -> None:
-        """Test pause() while paused raises AlreadyPausedError."""
+    @pytest.fixture
+    def paused_stopwatch(self) -> Stopwatch:
+        """Create a stopwatch in the paused state."""
         timer = Mock(side_effect=[0.0, 2.0, 5.0])
         stopwatch = Stopwatch(timer_func=timer)
 
         stopwatch.start()
         stopwatch.pause()
+        return stopwatch
 
+    @pytest.mark.parametrize(
+        "operation",
+        [
+            Stopwatch.pause,
+            Stopwatch.start,
+            Stopwatch.lap,
+            Stopwatch.stop,
+        ],
+        ids=["pause", "start", "lap", "stop"],
+    )
+    def test_operations_while_paused_raise_already_paused(
+        self,
+        paused_stopwatch: Stopwatch,
+        operation: Callable[[Stopwatch], object],
+    ) -> None:
+        """Test paused-only blocked operations raise AlreadyPausedError."""
         with pytest.raises(AlreadyPausedError):
-            stopwatch.pause()
-        assert not stopwatch.is_running
-        assert stopwatch.time_elapsed == 2.0
+            operation(paused_stopwatch)
+        assert not paused_stopwatch.is_running
+        assert paused_stopwatch.time_elapsed == 2.0
         # Still paused (not stopped), so resume must succeed.
-        stopwatch.resume()
-        assert stopwatch.is_running
-
-    def test_start_while_paused_raises_already_paused(self) -> None:
-        """Test start() while paused raises AlreadyPausedError."""
-        timer = Mock(side_effect=[0.0, 2.0, 5.0])
-        stopwatch = Stopwatch(timer_func=timer)
-
-        stopwatch.start()
-        stopwatch.pause()
-
-        with pytest.raises(AlreadyPausedError):
-            stopwatch.start()
-        assert not stopwatch.is_running
-        assert stopwatch.time_elapsed == 2.0
-        # Still paused (not stopped), so resume must succeed.
-        stopwatch.resume()
-        assert stopwatch.is_running
-
-    def test_lap_while_paused_raises_already_paused(self) -> None:
-        """Test lap() while paused raises AlreadyPausedError."""
-        timer = Mock(side_effect=[0.0, 2.0, 5.0])
-        stopwatch = Stopwatch(timer_func=timer)
-
-        stopwatch.start()
-        stopwatch.pause()
-
-        with pytest.raises(AlreadyPausedError):
-            stopwatch.lap()
-        assert not stopwatch.is_running
-        assert stopwatch.time_elapsed == 2.0
-        # Still paused (not stopped), so resume must succeed.
-        stopwatch.resume()
-        assert stopwatch.is_running
-
-    def test_stop_while_paused_raises_already_paused(self) -> None:
-        """Test stop() while paused raises AlreadyPausedError."""
-        timer = Mock(side_effect=[0.0, 2.0, 5.0])
-        stopwatch = Stopwatch(timer_func=timer)
-
-        stopwatch.start()
-        stopwatch.pause()
-
-        with pytest.raises(AlreadyPausedError):
-            stopwatch.stop()
-        assert not stopwatch.is_running
-        assert stopwatch.time_elapsed == 2.0
-        # Still paused (not stopped), so resume must succeed.
-        stopwatch.resume()
-        assert stopwatch.is_running
+        paused_stopwatch.resume()
+        assert paused_stopwatch.is_running
 
     def test_resume_not_started_raises_not_paused(
         self, stopwatch: Stopwatch

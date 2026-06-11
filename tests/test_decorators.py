@@ -1,22 +1,14 @@
 """Tests for the stopwatch decorator."""
 
 import asyncio
-import io
 import logging
 import time
-from contextlib import redirect_stdout
 from unittest.mock import Mock
 
 import pytest
 from _timing_output_assertions import assert_elapsed_seconds_displayed
 
 from ticko.decorators import stopwatch
-
-
-@pytest.fixture
-def mock_timer() -> Mock:
-    """Create a mock timer function."""
-    return Mock(side_effect=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
 
 
 class TestDecorationForms:
@@ -39,19 +31,20 @@ class TestDecorationForms:
         callback.assert_called_once()
         assert callback.call_args[0][0] == 1.0
 
-    def test_bare_decorator_wraps_function(self) -> None:
+    def test_bare_decorator_wraps_function(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
         """Test @stopwatch decoration."""
 
         @stopwatch
         def sample_func(x: int) -> int:
             return x + 1
 
-        f = io.StringIO()
-        with redirect_stdout(f):
-            result = sample_func(10)
+        result = sample_func(10)
 
         assert result == 11
-        output = f.getvalue()
+        output = capsys.readouterr().out
         assert "sample_func" in output
 
     def test_direct_decoration_with_custom_options(
@@ -180,24 +173,27 @@ class TestExitCallbackTiming:
 class TestDefaultCallbackOutput:
     """Test output written by the default callback."""
 
-    def test_default_callback_format(self, mock_timer: Mock) -> None:
+    def test_default_callback_format(
+        self,
+        mock_timer: Mock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
         """Test the default callback output format."""
 
         @stopwatch(timer_func=mock_timer)
         def my_function() -> None:
             pass
 
-        f = io.StringIO()
-        with redirect_stdout(f):
-            my_function()
+        my_function()
 
-        output = f.getvalue()
+        output = capsys.readouterr().out
         assert "my_function" in output
         assert_elapsed_seconds_displayed(output, 1.0)
 
     def test_default_callback_format_with_callable_object(
         self,
         mock_timer: Mock,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test the default callback output for callable objects."""
 
@@ -207,11 +203,9 @@ class TestDefaultCallbackOutput:
 
         decorated = stopwatch(Work(), timer_func=mock_timer)
 
-        f = io.StringIO()
-        with redirect_stdout(f):
-            result = decorated()
+        result = decorated()
 
-        output = f.getvalue()
+        output = capsys.readouterr().out
         assert result == "ok"
         assert "Work" in output
         assert_elapsed_seconds_displayed(output, 1.0)
@@ -219,6 +213,7 @@ class TestDefaultCallbackOutput:
     def test_default_callback_format_with_exception(
         self,
         mock_timer: Mock,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test the default callback output when the function raises."""
 
@@ -226,14 +221,10 @@ class TestDefaultCallbackOutput:
         def failing_function() -> None:
             raise ValueError("Test error")
 
-        f = io.StringIO()
-        with (
-            redirect_stdout(f),
-            pytest.raises(ValueError, match="Test error"),
-        ):
+        with pytest.raises(ValueError, match="Test error"):
             failing_function()
 
-        output = f.getvalue()
+        output = capsys.readouterr().out
         assert "failing_function" in output
         assert_elapsed_seconds_displayed(output, 1.0)
 
