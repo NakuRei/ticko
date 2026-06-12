@@ -10,12 +10,12 @@ import pytest
 from _timing_output_assertions import assert_elapsed_seconds_displayed
 
 from ticko import (
-    AlreadyPausedError,
     AlreadyRunningError,
     NoLapsRecordedError,
     NotPausedError,
     NotRunningError,
     NotStartedError,
+    PausedStateError,
     Stopwatch,
     StopwatchError,
 )
@@ -79,7 +79,7 @@ class TestStopwatchExceptionHierarchy:
             NotRunningError,
             NotStartedError,
             NoLapsRecordedError,
-            AlreadyPausedError,
+            PausedStateError,
             NotPausedError,
         ],
     )
@@ -97,31 +97,24 @@ class TestLifecycleOperations:
     def test_initial_state(self, stopwatch: Stopwatch) -> None:
         """Test stopwatch initial state."""
         assert not stopwatch.is_running
-        assert stopwatch.time_start is None
-        assert stopwatch.time_stop is None
+        with pytest.raises(NotStartedError):
+            _ = stopwatch.time_elapsed
 
     def test_start(self, stopwatch: Stopwatch) -> None:
         """Test starting the stopwatch."""
-        stopwatch.start()
+        stopwatch.start()  # time = 0.0
         assert stopwatch.is_running
-        assert stopwatch.time_start == 0.0
-        assert stopwatch.time_stop is None
+        assert stopwatch.time_elapsed == 1.0  # time = 1.0
 
-    def test_stop_records_stop_time_and_returns_elapsed_time(
+    def test_stop_returns_elapsed_time_and_freezes_it(
         self, stopwatch: Stopwatch
     ) -> None:
-        """Test stop() stores the stop time and returns the elapsed time."""
+        """Test stop() returns the elapsed time and freezes it."""
         stopwatch.start()  # time = 0.0
         elapsed = stopwatch.stop()  # time = 1.0
 
-        time_start = stopwatch.time_start
-        time_stop = stopwatch.time_stop
-
-        assert time_start is not None
-        assert time_stop is not None
-        assert time_start == 0.0
-        assert time_stop == 1.0
-        assert elapsed == time_stop - time_start
+        assert elapsed == 1.0
+        assert stopwatch.time_elapsed == 1.0
         assert not stopwatch.is_running
 
     def test_reset(self, stopwatch: Stopwatch) -> None:
@@ -132,8 +125,6 @@ class TestLifecycleOperations:
         stopwatch.reset()
 
         assert not stopwatch.is_running
-        assert stopwatch.time_start is None
-        assert stopwatch.time_stop is None
         with pytest.raises(NotStartedError):
             _ = stopwatch.time_elapsed
         with pytest.raises(NoLapsRecordedError):
@@ -151,8 +142,6 @@ class TestLifecycleOperations:
         stopwatch.reset()
 
         assert not stopwatch.is_running
-        assert stopwatch.time_start is None
-        assert stopwatch.time_stop is None
         with pytest.raises(NotStartedError):
             _ = stopwatch.time_elapsed
         with pytest.raises(NoLapsRecordedError):
@@ -180,8 +169,68 @@ class TestLifecycleOperations:
         stopwatch.start()  # time = 2.0
 
         assert stopwatch.is_running
-        assert stopwatch.time_start == 2.0
-        assert stopwatch.time_stop is None
+        # A new measurement counts from the second start(), not the first.
+        assert stopwatch.time_elapsed == 1.0  # time = 3.0
+
+
+class TestRestart:
+    """Test restart() beginning a fresh measurement from any state."""
+
+    def test_restart_from_initial_state_starts_measurement(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test restart() before start() begins a measurement."""
+        stopwatch.restart()  # time = 0.0
+        assert stopwatch.is_running
+        assert stopwatch.time_elapsed == 1.0  # time = 1.0
+
+    def test_restart_while_running_discards_measurement(self) -> None:
+        """Test restart() while running counts from the restart."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0])
+        callback = Mock()
+        stopwatch = Stopwatch(timer_func=timer, exit_callback=callback)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.restart()  # time = 2.0
+        callback.assert_not_called()
+
+        elapsed = stopwatch.stop()  # time = 5.0
+        assert elapsed == 3.0
+        callback.assert_called_once_with(3.0)
+
+    def test_restart_after_stop_begins_new_measurement(
+        self, stopwatch: Stopwatch
+    ) -> None:
+        """Test restart() after stop() begins a new measurement."""
+        stopwatch.start()  # time = 0.0
+        stopwatch.stop()  # time = 1.0
+        stopwatch.restart()  # time = 2.0
+
+        assert stopwatch.is_running
+        assert stopwatch.time_elapsed == 1.0  # time = 3.0
+
+    def test_restart_from_paused_discards_pause_state(self) -> None:
+        """Test restart() from paused resumes measuring immediately."""
+        timer = Mock(side_effect=[0.0, 2.0, 5.0, 9.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()  # time = 0.0
+        stopwatch.pause()  # time = 2.0
+        stopwatch.restart()  # time = 5.0
+
+        assert stopwatch.is_running
+        assert not stopwatch.is_paused
+        assert stopwatch.stop() == 4.0  # time = 9.0
+
+    def test_restart_clears_lap_history(self, stopwatch: Stopwatch) -> None:
+        """Test restart() clears previously recorded laps."""
+        stopwatch.start()  # time = 0.0
+        stopwatch.lap()  # time = 1.0
+        stopwatch.restart()  # time = 2.0
+
+        assert stopwatch.laps == ()
+        with pytest.raises(NoLapsRecordedError):
+            _ = stopwatch.time_since_last_lap
 
 
 class TestInvalidLifecycleOperations:
@@ -650,13 +699,12 @@ class TestContextManager:
             _raise_while_stopwatch_running()
 
         assert not stopwatch.is_running
-        assert stopwatch.time_stop is not None
+        assert stopwatch.time_elapsed == 1.0
 
     def test_context_manager_early_stop(self, stopwatch: Stopwatch) -> None:
         """Test context manager does not raise when stop() already called."""
         with stopwatch:
             stopwatch.stop()
-        # __exit__ should not raise even though stopwatch is already stopped
         assert not stopwatch.is_running
 
     def test_context_manager_early_stop_with_exception(
@@ -693,7 +741,6 @@ class TestContextManager:
 
         callback.assert_not_called()
         assert stopwatch.is_running
-        assert stopwatch.time_stop is None
         assert any(
             record.levelno >= logging.ERROR
             and (record.name == "ticko" or record.name.startswith("ticko."))
@@ -742,7 +789,6 @@ class TestContextManager:
 
         callback.assert_not_called()
         assert stopwatch.is_running
-        assert stopwatch.time_stop is None
 
 
 class TestExitCallbacks:
@@ -813,7 +859,6 @@ class TestExitCallbacks:
 
         callback.assert_not_called()
         assert sw.is_running
-        assert sw.time_stop is None
 
     def test_exit_callback_not_called_on_reset_before_start(
         self,
@@ -938,20 +983,14 @@ class TestTimerFunction:
         assert elapsed == 10.0
         assert custom_timer.call_count == 2
 
-    def test_custom_timer_values_are_exposed_as_raw_timestamps(
-        self,
-    ) -> None:
-        """Test custom timer values are exposed as raw timestamps."""
+    def test_custom_timer_values_drive_elapsed_time(self) -> None:
+        """Test elapsed time is computed from custom timer values."""
         custom_timer = Mock(side_effect=[1000.0, 1003.5])
         sw = Stopwatch(timer_func=custom_timer)
 
         sw.start()
-        assert sw.time_start == 1000.0
-
         elapsed = sw.stop()
 
-        assert sw.time_start == 1000.0
-        assert sw.time_stop == 1003.5
         assert elapsed == 3.5
         assert sw.time_elapsed == 3.5
 
@@ -1120,7 +1159,6 @@ class TestStr:
         str_running = str(stopwatch)
         stopwatch.stop()
         str_stopped = str(stopwatch)
-        # All should be different
         assert "not started" in str_not_started
         assert "running" in str_running
         assert "stopped" in str_stopped
@@ -1129,11 +1167,8 @@ class TestStr:
         """Test that __str__ and __repr__ return different values."""
         str_str = str(stopwatch)
         repr_str = repr(stopwatch)
-        # They should be different
         assert str_str != repr_str
-        # str should have state info
         assert "not started" in str_str
-        # repr should have constructor info
         assert "timer_func=" in repr_str
 
 
@@ -1294,8 +1329,6 @@ class TestPauseResume:
         stopwatch.reset()
 
         assert not stopwatch.is_running
-        assert stopwatch.time_start is None
-        assert stopwatch.time_stop is None
         assert stopwatch.laps == ()
         with pytest.raises(NotStartedError):
             _ = stopwatch.time_elapsed
@@ -1316,6 +1349,33 @@ class TestPauseResumeStr:
         assert "Stopwatch" in result
         assert "paused" in result
         assert_elapsed_seconds_displayed(result, 2.0)
+
+
+class TestIsPausedProperty:
+    """Test the is_paused state observer."""
+
+    @pytest.mark.parametrize(
+        ("operations", "expected"),
+        [
+            ([], False),
+            (["start"], False),
+            (["start", "pause"], True),
+            (["start", "pause", "resume"], False),
+            (["start", "stop"], False),
+            (["start", "pause", "reset"], False),
+        ],
+        ids=["initial", "running", "paused", "resumed", "stopped", "reset"],
+    )
+    def test_is_paused_reflects_state(
+        self,
+        stopwatch: Stopwatch,
+        operations: list[str],
+        expected: bool,  # noqa: FBT001 - parametrized expected value
+    ) -> None:
+        """Test is_paused is True exactly while paused."""
+        for operation in operations:
+            getattr(stopwatch, operation)()
+        assert stopwatch.is_paused is expected
 
 
 class TestPauseResumeErrors:
@@ -1341,13 +1401,13 @@ class TestPauseResumeErrors:
         ],
         ids=["pause", "start", "lap", "stop"],
     )
-    def test_operations_while_paused_raise_already_paused(
+    def test_operations_while_paused_raise_paused_state(
         self,
         paused_stopwatch: Stopwatch,
         operation: Callable[[Stopwatch], object],
     ) -> None:
-        """Test paused-only blocked operations raise AlreadyPausedError."""
-        with pytest.raises(AlreadyPausedError):
+        """Test paused-only blocked operations raise PausedStateError."""
+        with pytest.raises(PausedStateError):
             operation(paused_stopwatch)
         assert not paused_stopwatch.is_running
         assert paused_stopwatch.time_elapsed == 2.0
@@ -1438,8 +1498,28 @@ class TestPauseExitCallback:
             stopwatch.pause()  # time = 2.0
 
         assert not stopwatch.is_running
-        assert stopwatch.time_stop is not None
         assert stopwatch.time_elapsed == 2.0
         with pytest.raises(NotPausedError):
             stopwatch.resume()
+
+    def test_paused_exit_callback_exception_is_logged_not_raised(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Test a raising callback on paused exit logs without propagating."""
+        timer = Mock(side_effect=[0.0, 2.0])
+        callback = Mock(side_effect=RuntimeError("Callback error"))
+        stopwatch = Stopwatch(timer_func=timer, exit_callback=callback)
+
+        with caplog.at_level(logging.ERROR, logger="ticko"), stopwatch:
+            stopwatch.pause()  # time = 2.0
+
+        callback.assert_called_once_with(2.0)
+        assert stopwatch.time_elapsed == 2.0
+        assert any(
+            record.levelno >= logging.ERROR
+            and (record.name == "ticko" or record.name.startswith("ticko."))
+            and record.exc_info is not None
+            and isinstance(record.exc_info[1], RuntimeError)
+            for record in caplog.records
+        )
         callback.assert_called_once_with(2.0)

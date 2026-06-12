@@ -7,20 +7,21 @@ decorator for automatically measuring function execution times.
 Classes
 -------
 Stopwatch
-    Thread-safe stopwatch for measuring elapsed time with start, pause, resume,
-    stop, lap, and reset functionality.
+    Thread-safe stopwatch for measuring elapsed time with start, restart,
+    pause, resume, stop, lap, and reset functionality.
 StopwatchError
     Base class for all Stopwatch exceptions.
 AlreadyRunningError
     Raised when trying to start an already running stopwatch.
 NotRunningError
     Raised when stop(), lap(), or pause() is called while not running.
-AlreadyPausedError
+PausedStateError
     Raised when start(), pause(), lap(), or stop() is called while paused.
 NotPausedError
     Raised when resume() is called while the stopwatch is not paused.
 NotStartedError
-    Raised when accessing time_elapsed before start() has ever been called.
+    Raised when accessing time_elapsed while no measurement exists (never
+    started, or cleared by reset()).
 NoLapsRecordedError
     Raised when accessing time_since_last_lap before any lap has been recorded.
 
@@ -64,31 +65,26 @@ Using Stopwatch as a context manager:
 import logging
 
 from ._stopwatch import (
-    AlreadyPausedError,
     AlreadyRunningError,
     NoLapsRecordedError,
     NotPausedError,
     NotRunningError,
     NotStartedError,
+    PausedStateError,
     Stopwatch,
     StopwatchError,
 )
 from .decorators import stopwatch
 
-_package_logger = logging.getLogger(__name__)
-if not any(
-    isinstance(handler, logging.NullHandler)
-    for handler in _package_logger.handlers
-):
-    _package_logger.addHandler(logging.NullHandler())
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
-    "AlreadyPausedError",
     "AlreadyRunningError",
     "NoLapsRecordedError",
     "NotPausedError",
     "NotRunningError",
     "NotStartedError",
+    "PausedStateError",
     "Stopwatch",
     "StopwatchError",
     "stopwatch",

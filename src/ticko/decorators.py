@@ -2,15 +2,100 @@
 
 import functools
 import inspect
-import sys
+import logging
 import time
 from collections.abc import Awaitable, Callable
 from typing import ParamSpec, TypeVar, cast, overload
 
-from ._stopwatch import Stopwatch, stop_for_exception_cleanup
+from ._stopwatch import Stopwatch
+
+logger = logging.getLogger(__name__)
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+
+def _stop_during_exception_unwind(sw: Stopwatch) -> None:
+    """Stop while the wrapped function's exception is propagating.
+
+    A stop failure of type Exception is logged instead of raised so that
+    it never masks the original exception. BaseException (for example
+    KeyboardInterrupt) still propagates.
+    """
+    try:
+        sw.stop()
+    except Exception:
+        logger.exception("Stopwatch stop failed during exception cleanup")
+
+
+def _resolve_exit_callback(
+    f: Callable[..., object],
+    exit_callback: Callable[[float], None] | None,
+) -> Callable[[float], None]:
+    """Return the configured callback or the stdout-printing default."""
+    if exit_callback is not None:
+        return exit_callback
+
+    callable_name = getattr(f, "__name__", None)
+    if not isinstance(callable_name, str):
+        callable_name = getattr(f, "__qualname__", None)
+    if not isinstance(callable_name, str):
+        callable_name = type(f).__name__
+
+    def _default_callback(elapsed: float) -> None:
+        # Default callback intentionally writes timing output to stdout.
+        print(  # noqa: T201
+            f"Function {callable_name!r} exited after {elapsed:.6f} seconds",
+        )
+
+    return _default_callback
+
+
+def _wrap_async(
+    f: Callable[P, R],
+    timer_func: Callable[[], float],
+    callback: Callable[[float], None],
+) -> Callable[P, R]:
+    """Wrap an async callable so each call is timed by a Stopwatch."""
+    async_func = cast("Callable[P, Awaitable[object]]", f)
+
+    @functools.wraps(f)
+    async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> object:
+        sw = Stopwatch(timer_func=timer_func, exit_callback=callback)
+        sw.start()
+        try:
+            result = await async_func(*args, **kwargs)
+        except BaseException:
+            _stop_during_exception_unwind(sw)
+            raise
+        else:
+            sw.stop()
+            return result
+
+    return cast("Callable[P, R]", async_wrapper)
+
+
+def _wrap_sync(
+    f: Callable[P, R],
+    timer_func: Callable[[], float],
+    callback: Callable[[float], None],
+) -> Callable[P, R]:
+    """Wrap a sync callable so each call is timed by a Stopwatch."""
+
+    @functools.wraps(f)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        sw = Stopwatch(timer_func=timer_func, exit_callback=callback)
+        sw.start()
+        try:
+            result = f(*args, **kwargs)
+        except BaseException:
+            _stop_during_exception_unwind(sw)
+            raise
+        else:
+            sw.stop()
+            return result
+
+    return wrapper
 
 
 # Overload 1: Decorator without arguments (@stopwatch)
@@ -72,9 +157,10 @@ def stopwatch(
     -----
     The Stopwatch is stopped when the decorated function exits normally. It
     is also stopped when the decorated function raises, and the original
-    exception is re-raised after successful cleanup. If stopping fails while
-    preserving that exception, the stop failure is logged, the original
-    exception is re-raised, and exit_callback is not invoked.
+    exception is re-raised after successful cleanup. If stopping fails with
+    an Exception while preserving that exception, the stop failure is
+    logged, the original exception is re-raised, and exit_callback is not
+    invoked.
 
     When applied to an async function, timing includes the awaited function
     body until it returns or raises. When applied to a synchronous function
@@ -90,58 +176,13 @@ def stopwatch(
     """
 
     def _create_wrapper(f: Callable[P, R]) -> Callable[P, R]:
-        """Create the wrapper function for the given function."""
-        if exit_callback is None:
-            callable_name = getattr(f, "__name__", None)
-            if not isinstance(callable_name, str):
-                callable_name = getattr(f, "__qualname__", None)
-            if not isinstance(callable_name, str):
-                callable_name = type(f).__name__
-
-            def _default_callback(elapsed: float) -> None:
-                # Default callback intentionally writes timing output to stdout.
-                print(  # noqa: T201
-                    f"Function {callable_name!r} exited "
-                    f"after {elapsed:.6f} seconds",
-                )
-
-            callback: Callable[[float], None] = _default_callback
-        else:
-            callback = exit_callback
-
+        callback = _resolve_exit_callback(f, exit_callback)
         if inspect.iscoroutinefunction(f) or inspect.iscoroutinefunction(
             type(f).__call__,
         ):
-            async_func = cast("Callable[P, Awaitable[object]]", f)
-
-            @functools.wraps(f)
-            async def async_wrapper(
-                *args: P.args,
-                **kwargs: P.kwargs,
-            ) -> object:
-                sw = Stopwatch(timer_func=timer_func, exit_callback=callback)
-                sw.start()
-                try:
-                    return await async_func(*args, **kwargs)
-                finally:
-                    stop_for_exception_cleanup(sw, *sys.exc_info())
-
-            return cast("Callable[P, R]", async_wrapper)
-
-        @functools.wraps(f)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            sw = Stopwatch(timer_func=timer_func, exit_callback=callback)
-            sw.start()
-            try:
-                return f(*args, **kwargs)
-            finally:
-                stop_for_exception_cleanup(sw, *sys.exc_info())
-
-        return wrapper
+            return _wrap_async(f, timer_func, callback)
+        return _wrap_sync(f, timer_func, callback)
 
     if func is None:
-        # Return a decorator function
         return _create_wrapper
-
-    # Apply decorator directly
     return _create_wrapper(func)

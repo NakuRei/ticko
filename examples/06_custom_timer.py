@@ -1,16 +1,15 @@
-"""Using custom timer function with Stopwatch."""
+"""Using a custom timer function to measure CPU time."""
 
 import time
 
 from ticko import Stopwatch
 
-# Use time.time instead of default time.perf_counter
-sw = Stopwatch(timer_func=time.time)
+# time.process_time counts CPU time, so sleeping contributes ~0
+sw = Stopwatch(timer_func=time.process_time)
 sw.start()
 
-time.sleep(0.5)
+time.sleep(0.5)  # Waiting: barely any CPU time
+total = sum(i * i for i in range(10**6))  # Actual CPU work
 
-sw.stop()
-print(f"Elapsed time: {sw.time_elapsed:.3f} seconds")
-print(f"Start time (Unix timestamp): {sw.time_start}")
-print(f"Stop time (Unix timestamp): {sw.time_stop}")
+cpu_seconds = sw.stop()
+print(f"CPU time consumed: {cpu_seconds:.3f} seconds")

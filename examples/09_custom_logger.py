@@ -1,11 +1,12 @@
 """Custom logger configuration for ticko.
 
-ticko internally uses Python's standard logging module.
-The logger name is 'ticko._stopwatch', and all internal
-messages are emitted at DEBUG level.
+ticko internally uses Python's standard logging module under the
+'ticko' logger hierarchy. State transitions (start, lap, stop, ...)
+are emitted at DEBUG level; callback and cleanup failures are logged
+at ERROR level.
 
-By default nothing is printed because the root logger level
-is WARNING. Configure the 'ticko' logger to see the messages.
+By default nothing is printed because the package attaches a
+NullHandler. Configure the 'ticko' logger to see the messages.
 """
 
 import logging
@@ -42,8 +43,7 @@ file_handler.setFormatter(
     logging.Formatter("%(asctime)s %(levelname)s %(message)s")
 )
 
-file_logger = logging.getLogger("ticko._stopwatch")
-file_logger.addHandler(file_handler)
+ticko_logger.addHandler(file_handler)
 
 sw2 = Stopwatch(name="task-B")
 sw2.start()

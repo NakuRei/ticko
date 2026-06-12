@@ -169,6 +169,36 @@ class TestExitCallbackTiming:
             for record in caplog.records
         )
 
+    def test_stop_failure_propagates_when_called_inside_except_block(
+        self,
+    ) -> None:
+        """Test stop failure propagates when the function itself succeeds.
+
+        An exception being handled in the caller must not be mistaken for
+        a failure of the decorated function.
+        """
+        timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
+        callback = Mock()
+
+        @stopwatch(timer_func=timer, exit_callback=callback)
+        def succeeding_func() -> str:
+            return "ok"
+
+        def _raise_outer_error() -> None:
+            raise ValueError("outer error being handled")
+
+        def call_inside_except_block() -> str:
+            try:
+                _raise_outer_error()
+            except ValueError:
+                return succeeding_func()
+            return ""
+
+        with pytest.raises(RuntimeError, match="timer failed"):
+            call_inside_except_block()
+
+        callback.assert_not_called()
+
 
 class TestDefaultCallbackOutput:
     """Test output written by the default callback."""
@@ -366,3 +396,33 @@ class TestAsyncWrappedFunctions:
             and str(record.exc_info[1]) == "timer failed"
             for record in caplog.records
         )
+
+    def test_async_stop_failure_propagates_when_called_inside_except_block(
+        self,
+    ) -> None:
+        """Test async stop failure propagates when the body succeeds.
+
+        An exception being handled in the caller must not be mistaken for
+        a failure of the awaited function.
+        """
+        timer = Mock(side_effect=[0.0, RuntimeError("timer failed")])
+        callback = Mock()
+
+        @stopwatch(timer_func=timer, exit_callback=callback)
+        async def succeeding_func() -> str:
+            return "ok"
+
+        def _raise_outer_error() -> None:
+            raise ValueError("outer error being handled")
+
+        async def call_inside_except_block() -> str:
+            try:
+                _raise_outer_error()
+            except ValueError:
+                return await succeeding_func()
+            return ""
+
+        with pytest.raises(RuntimeError, match="timer failed"):
+            asyncio.run(call_inside_except_block())
+
+        callback.assert_not_called()

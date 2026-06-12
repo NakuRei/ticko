@@ -6,10 +6,7 @@ from ticko import stopwatch
 
 
 def custom_callback(elapsed: float) -> None:
-    """Log execution time.
-
-    Custom callback to log execution time.
-    """
+    """Print the measured execution time."""
     print(f"Function took {elapsed:.3f} seconds")
 
 

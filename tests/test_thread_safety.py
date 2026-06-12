@@ -8,12 +8,12 @@ from typing import Any
 import pytest
 
 from ticko import (
-    AlreadyPausedError,
     AlreadyRunningError,
     NoLapsRecordedError,
     NotPausedError,
     NotRunningError,
     NotStartedError,
+    PausedStateError,
     Stopwatch,
 )
 
@@ -91,15 +91,13 @@ def collect_getter_outcomes(sw: Stopwatch) -> GetterSnapshot:
     """Read the public Stopwatch getters and capture each result separately."""
     return {
         "is_running": capture_outcome(lambda: sw.is_running),
-        "time_start": capture_outcome(lambda: sw.time_start),
-        "time_stop": capture_outcome(lambda: sw.time_stop),
         "time_elapsed": capture_outcome(lambda: sw.time_elapsed),
         "time_since_last_lap": capture_outcome(lambda: sw.time_since_last_lap),
     }
 
 
 def assert_non_negative_number(value: Any) -> None:
-    """Assert that a value is a non-negative numeric duration or timestamp."""
+    """Assert that a value is a non-negative numeric duration."""
     assert isinstance(value, int | float)
     assert not isinstance(value, bool)
     assert value >= 0
@@ -123,8 +121,6 @@ def assert_raised(outcome: Outcome, exc_type: type[Exception]) -> Exception:
 def assert_reset_state(sw: Stopwatch) -> None:
     """Assert that the stopwatch is back in its public initial state."""
     assert not sw.is_running
-    assert sw.time_start is None
-    assert sw.time_stop is None
     with pytest.raises(NotStartedError):
         _ = sw.time_elapsed
     with pytest.raises(NoLapsRecordedError):
@@ -134,18 +130,12 @@ def assert_reset_state(sw: Stopwatch) -> None:
 def assert_running_state(sw: Stopwatch) -> None:
     """Assert that the stopwatch is in a valid running state."""
     assert sw.is_running
-    assert sw.time_start is not None
-    assert_non_negative_number(sw.time_start)
-    assert sw.time_stop is None
+    assert_non_negative_number(sw.time_elapsed)
 
 
 def assert_stopped_state(sw: Stopwatch, expected_elapsed: float) -> None:
     """Assert that the stopwatch is in a valid stopped state."""
     assert not sw.is_running
-    assert sw.time_start is not None
-    assert_non_negative_number(sw.time_start)
-    assert sw.time_stop is not None
-    assert_non_negative_number(sw.time_stop)
     assert sw.time_elapsed == expected_elapsed
 
 
@@ -155,12 +145,6 @@ def assert_getter_snapshot_during_running_reset(
     """Validate getter outcomes while reset() races with readers."""
     assert_returned(snapshot["is_running"])
     assert isinstance(snapshot["is_running"][1], bool)
-
-    time_start = assert_returned(snapshot["time_start"])
-    if time_start is not None:
-        assert_non_negative_number(time_start)
-
-    assert snapshot["time_stop"] == ("return", None)
 
     time_elapsed = snapshot["time_elapsed"]
     if time_elapsed[0] == "return":
@@ -176,13 +160,6 @@ def assert_getter_snapshot_during_stop(snapshot: GetterSnapshot) -> None:
     is_running = assert_returned(snapshot["is_running"])
     assert isinstance(is_running, bool)
 
-    time_start = assert_returned(snapshot["time_start"])
-    assert_non_negative_number(time_start)
-
-    time_stop = assert_returned(snapshot["time_stop"])
-    if time_stop is not None:
-        assert_non_negative_number(time_stop)
-
     time_elapsed = assert_returned(snapshot["time_elapsed"])
     assert_non_negative_number(time_elapsed)
 
@@ -193,11 +170,6 @@ def assert_getter_snapshot_during_lap(snapshot: GetterSnapshot) -> None:
     """Validate getter outcomes while lap() races with readers."""
     is_running = assert_returned(snapshot["is_running"])
     assert is_running is True
-
-    time_start = assert_returned(snapshot["time_start"])
-    assert_non_negative_number(time_start)
-
-    assert snapshot["time_stop"] == ("return", None)
 
     time_elapsed = assert_returned(snapshot["time_elapsed"])
     assert_non_negative_number(time_elapsed)
@@ -512,13 +484,13 @@ class TestThreadSafety:
             1
             for outcome in outcomes
             if outcome[0] == "raise"
-            and isinstance(outcome[1], AlreadyPausedError)
+            and isinstance(outcome[1], PausedStateError)
         )
 
         assert success_count == 1
         assert error_count == 9
         assert not sw.is_running
-        assert sw.time_start is not None
+        assert_non_negative_number(sw.time_elapsed)
 
     def test_concurrent_resume_attempts(self) -> None:
         """Only one concurrent resume() should succeed on a paused stopwatch."""
@@ -540,6 +512,15 @@ class TestThreadSafety:
         assert error_count == 9
         assert sw.is_running
 
+    def test_concurrent_restart_attempts_all_succeed(self) -> None:
+        """Every concurrent restart() should succeed regardless of state."""
+        sw = make_stopwatch()
+        sw.start()
+        outcomes = run_concurrently(*(sw.restart for _ in range(10)))
+
+        assert all(outcome == ("return", None) for outcome in outcomes)
+        assert sw.is_running
+
     def test_pause_and_resume_race(self) -> None:
         """pause() and resume() should expose only legal public outcomes."""
         sw = make_stopwatch()
@@ -557,7 +538,7 @@ class TestThreadSafety:
             assert_raised(resume_outcome, NotPausedError)
             assert not sw.is_running
 
-        assert sw.time_start is not None
+        assert_non_negative_number(sw.time_elapsed)
 
 
 class TestBehaviorUnderLoad:
