@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-06-11
+## [2.0.0] - 2026-06-13
 
 ### Added
 
@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `name` keyword argument to `Stopwatch` and a read-only `name` property; the name appears in log messages and string representations to identify a stopwatch
 - `Stopwatch.laps` property returning the full history of recorded lap durations as an immutable tuple in recording order; `stop()` now appends the final segment so the durations sum to `time_elapsed`
 - Dedicated exception classes `NotRunningError`, `PausedStateError`, `NotPausedError`, and `NoLapsRecordedError`, splitting lifecycle, paused-state, and missing-lap failures into specific `StopwatchError` subclasses
+- Official support for Python 3.14
 
 ### Changed
 
