@@ -20,13 +20,16 @@ class AlreadyRunningError(StopwatchError):
 
 
 class NotRunningError(StopwatchError):
-    """Raised when stop(), lap(), or pause() is called while not running."""
+    """Raised when stop(), lap(), or pause() is used with no open session.
+
+    Covers a stopwatch that has not started, has stopped, or was reset.
+    """
 
 
 class PausedStateError(StopwatchError):
     """Raised when an operation is blocked because the stopwatch is paused.
 
-    Covers start(), pause(), lap(), and stop() while paused.
+    Covers start(), pause(), and lap() while paused.
     """
 
 
@@ -423,15 +426,15 @@ class Stopwatch:
         """Stop the stopwatch."""
         with self._lock:
             if self._state is _State.PAUSED:
-                msg = "Stopwatch is paused. Call resume() before stopping."
-                raise PausedStateError(msg)
-            if self._state is not _State.RUNNING:
+                time_elapsed = self._finalize_paused_locked()
+            elif self._state is _State.RUNNING:
+                time_elapsed = self._stop_running_locked()
+            else:
                 msg = (
                     "Stopwatch is not running. "
                     "Call start() first before stopping."
                 )
                 raise NotRunningError(msg)
-            time_elapsed: Final = self._stop_running_locked()
 
         self._invoke_exit_callback(time_elapsed)
         return time_elapsed

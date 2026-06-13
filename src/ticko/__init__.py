@@ -14,9 +14,9 @@ StopwatchError
 AlreadyRunningError
     Raised when trying to start an already running stopwatch.
 NotRunningError
-    Raised when stop(), lap(), or pause() is called while not running.
+    Raised when stop(), lap(), or pause() is used with no open session.
 PausedStateError
-    Raised when start(), pause(), lap(), or stop() is called while paused.
+    Raised when start(), pause(), or lap() is called while paused.
 NotPausedError
     Raised when resume() is called while the stopwatch is not paused.
 NotStartedError

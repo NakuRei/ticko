@@ -1249,6 +1249,42 @@ class TestPauseResume:
         assert elapsed == 6.0
         assert stopwatch.time_elapsed == 6.0
 
+    def test_stop_while_paused_uses_frozen_elapsed(self) -> None:
+        """Test stop() while paused finalizes at the pause instant."""
+        timer = Mock(
+            side_effect=[
+                0.0,
+                2.0,
+                AssertionError("timer read after pause"),
+            ],
+        )
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.pause()
+        elapsed = stopwatch.stop()
+
+        assert elapsed == 2.0
+        assert stopwatch.time_elapsed == 2.0
+        assert not stopwatch.is_running
+        assert not stopwatch.is_paused
+        with pytest.raises(NotPausedError):
+            stopwatch.resume()
+
+    def test_stop_while_paused_records_final_lap_segment(self) -> None:
+        """Test paused stop appends the final pause-excluded segment."""
+        timer = Mock(side_effect=[0.0, 1.0, 4.0])
+        stopwatch = Stopwatch(timer_func=timer)
+
+        stopwatch.start()
+        stopwatch.lap()
+        stopwatch.pause()
+        elapsed = stopwatch.stop()
+
+        assert elapsed == 4.0
+        assert stopwatch.laps == (1.0, 3.0)
+        assert sum(stopwatch.laps) == stopwatch.time_elapsed
+
     def test_time_since_last_lap_excludes_paused_interval(self) -> None:
         """Test time_since_last_lap excludes a pause after the last lap."""
         timer = Mock(side_effect=[0.0, 1.0, 4.0, 7.0, 11.0])
@@ -1397,9 +1433,8 @@ class TestPauseResumeErrors:
             Stopwatch.pause,
             Stopwatch.start,
             Stopwatch.lap,
-            Stopwatch.stop,
         ],
-        ids=["pause", "start", "lap", "stop"],
+        ids=["pause", "start", "lap"],
     )
     def test_operations_while_paused_raise_paused_state(
         self,
@@ -1487,6 +1522,19 @@ class TestPauseExitCallback:
         stopwatch.pause()
 
         callback.assert_not_called()
+
+    def test_stop_while_paused_invokes_exit_callback_once(self) -> None:
+        """Test paused stop reports the frozen elapsed time."""
+        timer = Mock(side_effect=[0.0, 2.0])
+        callback = Mock()
+        stopwatch = Stopwatch(timer_func=timer, exit_callback=callback)
+
+        stopwatch.start()
+        stopwatch.pause()
+        elapsed = stopwatch.stop()
+
+        assert elapsed == 2.0
+        callback.assert_called_once_with(2.0)
 
     def test_context_manager_exit_finalizes_paused_watch(self) -> None:
         """Test exiting a context manager while paused stops and reports."""

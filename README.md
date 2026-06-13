@@ -86,9 +86,8 @@ elapsed = sw.stop()
 ```
 
 Paused intervals are excluded from `time_elapsed`. Use `is_paused` to check
-for the paused state. Calling `stop()` directly while paused raises
-`PausedStateError`; call `resume()` before `stop()`, or use a context manager
-to finalize a paused stopwatch when the context exits.
+for the paused state. Calling `stop()` while paused finalizes the stopwatch
+with the elapsed time frozen at `pause()`.
 
 ### Lap Timing
 
@@ -228,15 +227,15 @@ must not call methods or properties on the same `Stopwatch` instance.
 - `restart()` - Discard any in-progress measurement and start a new one in a single atomic step
 - `pause()` - Pause timing and exclude the paused interval from elapsed time
 - `resume()` - Resume a paused stopwatch
-- `stop()` - Stop, call `exit_callback` when configured, and return elapsed time
+- `stop()` - Stop a running or paused stopwatch, call `exit_callback` when configured, and return elapsed time
 - `lap()` - Record and return lap duration
 - `reset()` - Reset to initial state without calling `exit_callback`
 
 **Exceptions:**
 - `StopwatchError` - Base class for stopwatch exceptions
 - `AlreadyRunningError` - Raised when starting an already running stopwatch
-- `NotRunningError` - Raised when stopping, lapping, or pausing a stopwatch that is not running
-- `PausedStateError` - Raised when an operation is blocked because the stopwatch is paused
+- `NotRunningError` - Raised when stopping, lapping, or pausing before start, after stop, or after reset
+- `PausedStateError` - Raised when starting, pausing, or lapping while paused
 - `NotPausedError` - Raised when resuming a stopwatch that is not paused
 - `NotStartedError` - Raised when reading elapsed time before the first start or after a reset
 - `NoLapsRecordedError` - Raised when reading lap elapsed time before any lap
@@ -267,7 +266,7 @@ object is returned. Awaiting or consuming that object is not measured.
 - Rename `time_last_lap` to `time_since_last_lap`
 - Remove uses of `time_last_lap_start` and `InvalidStateError`
 - Pass `timer_func` and `exit_callback` to `Stopwatch` as keyword arguments; positional arguments are no longer accepted
-- Update `except NotStartedError` handlers: `stop()` and `lap()` on a non-running stopwatch now raise `NotRunningError`, and `time_since_last_lap` before any lap raises `NoLapsRecordedError`
+- Update `except NotStartedError` handlers: `stop()` and `lap()` before start, after stop, or after reset now raise `NotRunningError`, and `time_since_last_lap` before any lap raises `NoLapsRecordedError`
 - Remove uses of the `time_start` and `time_stop` properties; use `time_elapsed` for measurements, or record your own timestamps next to `start()`/`stop()` if you need absolute times
 
 ## Development

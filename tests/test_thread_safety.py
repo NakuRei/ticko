@@ -512,6 +512,29 @@ class TestThreadSafety:
         assert error_count == 9
         assert sw.is_running
 
+    def test_concurrent_stop_attempts_while_paused(self) -> None:
+        """Only one concurrent stop() should succeed on a paused stopwatch."""
+        sw = make_stopwatch()
+        sw.start()
+        sw.pause()
+        outcomes = run_concurrently(*(sw.stop for _ in range(10)))
+
+        successful_stops = [
+            outcome[1] for outcome in outcomes if outcome[0] == "return"
+        ]
+        stop_errors = [
+            outcome[1]
+            for outcome in outcomes
+            if outcome[0] == "raise" and isinstance(outcome[1], NotRunningError)
+        ]
+
+        assert len(successful_stops) == 1
+        assert successful_stops[0] == 1.0
+        assert len(stop_errors) == 9
+        assert not sw.is_running
+        assert not sw.is_paused
+        assert sw.time_elapsed == 1.0
+
     def test_concurrent_restart_attempts_all_succeed(self) -> None:
         """Every concurrent restart() should succeed regardless of state."""
         sw = make_stopwatch()

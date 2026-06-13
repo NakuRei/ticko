@@ -26,7 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `exit_callback` now receives the elapsed time as a `float` instead of the stopwatch instance; its type changed from `Callable[[Stopwatch], None]` to `Callable[[float], None]`, affecting both `Stopwatch` and the `@stopwatch` decorator
 - `Stopwatch.start()` now returns `None` instead of the start time
 - `Stopwatch` constructor arguments are now keyword-only; pass `timer_func` and `exit_callback` by name
-- `stop()` and `lap()` on a stopwatch that is not running now raise `NotRunningError` instead of `NotStartedError`, and `time_since_last_lap` before any lap raises `NoLapsRecordedError` instead of `NotStartedError`
+- `stop()` and `lap()` before start, after stop, or after reset now raise `NotRunningError` instead of `NotStartedError`, and `time_since_last_lap` before any lap raises `NoLapsRecordedError` instead of `NotStartedError`
+- `Stopwatch.stop()` now finalizes a paused stopwatch using the elapsed time frozen at `pause()`, matching context-manager exit behavior
 - The default `@stopwatch` message changed from `Function '<name>' executed in <n> seconds` to `Function '<name>' exited after <n> seconds`
 
 ### Removed
