@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-06-13
+## [2.0.0] - 2026-06-14
 
 ### Added
 
@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `name` keyword argument to `Stopwatch` and a read-only `name` property; the name appears in log messages and string representations to identify a stopwatch
 - `Stopwatch.laps` property returning the full history of recorded lap durations as an immutable tuple in recording order; `stop()` now appends the final segment so the durations sum to `time_elapsed`
 - Dedicated exception classes `NotRunningError`, `PausedStateError`, `NotPausedError`, and `NoLapsRecordedError`, splitting lifecycle, paused-state, and missing-lap failures into specific `StopwatchError` subclasses
+- All Stopwatch exception classes are now exported from the package root; import them from `ticko` instead of implementation modules
 - `@stopwatch` now measures generator and async generator body execution during consumption, excluding time spent between yielded values
 - Official support for Python 3.14
 
@@ -30,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `stop()` and `lap()` before start, after stop, or after reset now raise `NotRunningError` instead of `NotStartedError`, and `time_since_last_lap` before any lap raises `NoLapsRecordedError` instead of `NotStartedError`
 - `Stopwatch.stop()` now finalizes a paused stopwatch using the elapsed time frozen at `pause()`, matching context-manager exit behavior
 - The default `@stopwatch` message changed from `Function '<name>' executed in <n> seconds` to `Function '<name>' exited after <n> seconds`
+- `@stopwatch` no longer logs the decorated function's own exception at `ERROR` level; the exception propagates unchanged, while stopwatch cleanup failures are still logged without masking it
+- The package is now published as `Development Status :: 5 - Production/Stable` instead of `4 - Beta`
 
 ### Removed
 
