@@ -281,17 +281,38 @@ class _TimedAsyncGenerator:
             "Callable[..., Awaitable[object]]",
             self._async_generator.athrow,
         )
-        if val is _MISSING:
-            return await self._await_with_timing(lambda: athrow(typ), "athrow")
-        if tb is _MISSING:
-            return await self._await_with_timing(
-                lambda: athrow(typ, val),
-                "athrow",
-            )
+
+        def create_athrow_awaitable() -> Awaitable[object]:
+            if val is _MISSING:
+                return athrow(typ)
+            if tb is _MISSING:
+                return athrow(typ, val)
+            return athrow(typ, val, tb)
+
+        if (
+            not self._execution_timer.has_started
+            and not self._execution_timer.is_finalized
+        ):
+            return await self._athrow_before_start(create_athrow_awaitable)
         return await self._await_with_timing(
-            lambda: athrow(typ, val, tb),
+            create_athrow_awaitable,
             "athrow",
         )
+
+    async def _athrow_before_start(
+        self,
+        create_awaitable: Callable[[], Awaitable[object]],
+    ) -> object:
+        self._is_driving = True
+        try:
+            return await create_awaitable()
+        finally:
+            try:
+                if self._async_generator_is_closed():
+                    self._async_generator_closed = True
+                    self._execution_timer.stop_after_completion()
+            finally:
+                self._is_driving = False
 
     async def aclose(self) -> None:
         """Close the wrapped async generator."""
@@ -442,13 +463,38 @@ class _TimedGenerator:
         /,
     ) -> object:
         """Throw an exception into the wrapped generator."""
+        self._reject_if_driving()
         _validate_throw_arguments(typ, val, tb)
         throw = cast("Callable[..., object]", self._generator.throw)
-        if val is _MISSING:
-            return self._resume_with_timing(lambda: throw(typ))
-        if tb is _MISSING:
-            return self._resume_with_timing(lambda: throw(typ, val))
-        return self._resume_with_timing(lambda: throw(typ, val, tb))
+
+        def throw_into_generator() -> object:
+            if val is _MISSING:
+                return throw(typ)
+            if tb is _MISSING:
+                return throw(typ, val)
+            return throw(typ, val, tb)
+
+        if (
+            not self._execution_timer.has_started
+            and not self._execution_timer.is_finalized
+        ):
+            return self._throw_before_start(throw_into_generator)
+        return self._resume_with_timing(throw_into_generator)
+
+    def _throw_before_start(
+        self,
+        throw_into_generator: Callable[[], object],
+    ) -> object:
+        self._is_driving = True
+        try:
+            return throw_into_generator()
+        finally:
+            try:
+                if self._generator_is_closed():
+                    self._generator_closed = True
+                    self._execution_timer.stop_after_completion()
+            finally:
+                self._is_driving = False
 
     def close(self) -> None:
         """Close the wrapped generator."""

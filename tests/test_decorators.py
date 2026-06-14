@@ -984,6 +984,54 @@ class TestGeneratorWrappedFunctions:
 
         callback.assert_called_once_with(5.0)
 
+    def test_generator_reentrant_throw_rejects_before_validation(
+        self,
+    ) -> None:
+        """Test throw while running rejects before validating arguments."""
+        first_value_started = threading.Event()
+        first_value_can_finish = threading.Event()
+        thread_results: list[str] = []
+        thread_errors: list[BaseException] = []
+        timer = Mock(side_effect=[0.0, 1.0, 10.0, 12.0, 20.0, 22.0])
+        callback = Mock()
+
+        @stopwatch(timer_func=timer, exit_callback=callback)
+        def sample_generator() -> Generator[str, None, None]:
+            first_value_started.set()
+            first_value_can_finish.wait()
+            yield "first"
+            yield "second"
+
+        generator = sample_generator()
+        throw = cast("Callable[..., object]", generator.throw)
+
+        def consume_first_value() -> None:
+            try:
+                thread_results.append(next(generator))
+            except BaseException as exc:
+                thread_errors.append(exc)
+
+        thread = threading.Thread(target=consume_first_value)
+        thread.start()
+
+        try:
+            assert first_value_started.wait(timeout=5.0)
+            with pytest.raises(ValueError, match="already executing"):
+                throw("bad")
+
+            callback.assert_not_called()
+        finally:
+            first_value_can_finish.set()
+            thread.join(timeout=5.0)
+
+        assert thread_results == ["first"]
+        assert thread_errors == []
+        assert next(generator) == "second"
+        with pytest.raises(StopIteration):
+            next(generator)
+
+        callback.assert_called_once_with(5.0)
+
     def test_generator_callback_runs_after_body_exception(self) -> None:
         """Test generator body exceptions are measured before propagation."""
         events: list[str] = []
@@ -1097,6 +1145,32 @@ class TestGeneratorWrappedFunctions:
         assert next(generator) == "ready"
         generator.close()
         callback.assert_called_once_with(3.0)
+
+    def test_generator_throw_before_start_does_not_report_timing(
+        self,
+    ) -> None:
+        """Test throw before start closes without timing body execution."""
+        events: list[str] = []
+        timer = Mock(side_effect=[0.0, 1.0])
+        callback = Mock()
+
+        @stopwatch(timer_func=timer, exit_callback=callback)
+        def sample_generator() -> Generator[str, None, None]:
+            events.append("body-start")
+            yield "ready"
+
+        generator = sample_generator()
+
+        with pytest.raises(ValueError, match="boom"):
+            generator.throw(ValueError("boom"))
+
+        assert events == []
+        timer.assert_not_called()
+        callback.assert_not_called()
+        with pytest.raises(StopIteration):
+            next(generator)
+        timer.assert_not_called()
+        callback.assert_not_called()
 
     @pytest.mark.parametrize(
         "args",
@@ -1512,6 +1586,47 @@ class TestAsyncGeneratorWrappedFunctions:
         asyncio.run(run())
         callback.assert_called_once_with(5.0)
 
+    def test_async_generator_reentrant_athrow_rejects_before_validation(
+        self,
+    ) -> None:
+        """Test athrow while running rejects before validating arguments."""
+        timer = Mock(side_effect=[0.0, 1.0, 10.0, 12.0, 20.0, 22.0])
+        callback = Mock()
+
+        async def run() -> None:
+            first_value_started = asyncio.Event()
+            first_value_can_finish = asyncio.Event()
+
+            @stopwatch(timer_func=timer, exit_callback=callback)
+            async def sample_generator() -> AsyncGenerator[str, None]:
+                first_value_started.set()
+                await first_value_can_finish.wait()
+                yield "first"
+                yield "second"
+
+            generator = sample_generator()
+            invalid_athrow = cast(
+                "Callable[..., Awaitable[str]]",
+                generator.athrow,
+            )
+            first_value_task = asyncio.create_task(anext(generator))
+
+            try:
+                await asyncio.wait_for(first_value_started.wait(), timeout=5.0)
+                with pytest.raises(RuntimeError, match="already running"):
+                    await invalid_athrow("bad")
+
+                callback.assert_not_called()
+            finally:
+                first_value_can_finish.set()
+            assert await first_value_task == "first"
+            assert await anext(generator) == "second"
+            with pytest.raises(StopAsyncIteration):
+                await anext(generator)
+
+        asyncio.run(run())
+        callback.assert_called_once_with(5.0)
+
     def test_async_generator_implicit_shutdown_does_not_report_time(
         self,
     ) -> None:
@@ -1662,6 +1777,35 @@ class TestAsyncGeneratorWrappedFunctions:
 
         asyncio.run(run())
         callback.assert_called_once_with(3.0)
+
+    def test_async_generator_athrow_before_start_does_not_report_timing(
+        self,
+    ) -> None:
+        """Test athrow before start closes without timing body execution."""
+        events: list[str] = []
+        timer = Mock(side_effect=[0.0, 1.0])
+        callback = Mock()
+
+        @stopwatch(timer_func=timer, exit_callback=callback)
+        async def sample_generator() -> AsyncGenerator[str, None]:
+            events.append("body-start")
+            yield "ready"
+
+        async def run() -> None:
+            generator = sample_generator()
+
+            with pytest.raises(ValueError, match="boom"):
+                await generator.athrow(ValueError("boom"))
+
+            assert events == []
+            timer.assert_not_called()
+            callback.assert_not_called()
+            with pytest.raises(StopAsyncIteration):
+                await anext(generator)
+            timer.assert_not_called()
+            callback.assert_not_called()
+
+        asyncio.run(run())
 
     @pytest.mark.parametrize(
         "args",
