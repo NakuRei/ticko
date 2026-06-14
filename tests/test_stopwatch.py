@@ -60,7 +60,6 @@ class DiagnosticRecordHandler(logging.Handler):
     """Collect application-observed diagnostic log records."""
 
     def __init__(self) -> None:
-        """Initialize the record collection handler."""
         super().__init__(level=logging.ERROR)
         self.records: list[logging.LogRecord] = []
 
@@ -1081,7 +1080,6 @@ class TestRepr:
         timer_values = iter([0.0, 1.0])
 
         def state_timer() -> float:
-            """Return the next state-transition timer value."""
             return next(timer_values)
 
         sw = Stopwatch(timer_func=state_timer)

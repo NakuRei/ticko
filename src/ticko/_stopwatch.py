@@ -142,23 +142,7 @@ class Stopwatch:
         timer_func: Callable[[], float] = time.perf_counter,
         exit_callback: Callable[[float], None] | None = None,
     ) -> None:
-        """Initialize the stopwatch.
-
-        Parameters
-        ----------
-        name : str | None, optional
-            Optional name for identifying this stopwatch in log messages and
-            string representations (default: None).
-        timer_func : Callable[[], float], optional
-            Function returning the current time (default: time.perf_counter).
-            It should be fast and side-effect-light. It may be called while
-            the stopwatch holds its internal lock, so it must not call methods
-            or properties on the same Stopwatch instance.
-        exit_callback : Callable[[float], None] | None, optional
-            Optional callback invoked with the elapsed time when the stopwatch
-            is stopped.
-
-        """
+        """Initialize the stopwatch."""
         self._name: Final = name
         self._timer_func: Final = timer_func
         self._exit_callback: Final = exit_callback
