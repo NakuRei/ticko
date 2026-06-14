@@ -205,7 +205,7 @@ with ThreadPoolExecutor(max_workers=5) as executor:
 elapsed = sw.stop()
 ```
 
-For more examples, see the [`examples/`](examples/) directory.
+For more examples, see the [`examples/`](https://github.com/NakuRei/ticko/tree/main/examples) directory.
 
 ## API Overview
 
