@@ -13,7 +13,7 @@ A modern, thread-safe stopwatch library for Python.
 - **Type-safe** - Full type hints for excellent IDE support
 - **Zero dependencies** - Pure Python, no external requirements
 - **Flexible API** - Context managers, decorators, or manual control
-- **Production-ready** - Comprehensive test coverage
+- **Well-tested** - Comprehensive test coverage
 
 ## Installation
 
@@ -135,17 +135,10 @@ load_data()
 The decorator prints elapsed time to stdout by default. Pass `exit_callback` to
 send elapsed seconds to logging, metrics, stderr, or another destination.
 
-Generator functions are timed during consumption, not object creation. They
-report elapsed time when exhausted, when an exception leaves the wrapper, or
-when explicitly closed. Time spent between yielded values is excluded, so
-generator timing measures the generator body rather than the consumer's work
-between pulls. For partially consumed async generators, event-loop or
-garbage-collection cleanup can close the underlying generator without invoking
-the decorator callback. Fully consume the async generator or call
+Generator and async generator functions are timed during consumption, not
+object creation, and time spent between yielded values is excluded. For
+partially consumed async generators, fully consume the generator or call
 `await generator.aclose()` when elapsed time must be reported.
-
-Decorated generator and async generator callables return protocol-compatible
-wrapper objects; see the `@stopwatch` API notes for introspection details.
 
 ### Custom Callbacks
 
@@ -153,9 +146,7 @@ wrapper objects; see the `@stopwatch` API notes for introspection details.
 `Callable[[float], None]`. The callback receives elapsed seconds when timing
 finishes.
 
-`@stopwatch` prints a human-readable timing message to stdout by default. This
-is useful for scripts, examples, and interactive use where immediate feedback is
-the goal. If stdout is used for structured data or piped output, pass
+If the program uses stdout for structured data or piped output, pass
 `exit_callback` to route timing information elsewhere.
 
 ```python
@@ -208,7 +199,8 @@ sw.start()
 
 # Multiple threads can safely share one Stopwatch
 with ThreadPoolExecutor(max_workers=5) as executor:
-    futures = [executor.submit(sw.lap) for _ in range(10)]
+    for _ in range(10):
+        executor.submit(sw.lap)
 
 elapsed = sw.stop()
 ```
@@ -278,15 +270,11 @@ time spent executing the generator body, including cleanup run by `close()` or
 wrap the consumer loop with `Stopwatch` instead.
 
 Decorated generator and async generator callables return protocol-compatible
-wrapper objects. They support the relevant generator protocol methods (`send`,
-`throw`, and `close` for generators; `asend`, `athrow`, and `aclose` for async
-generators), and satisfy `collections.abc.Generator` or
-`collections.abc.AsyncGenerator` checks. They are not native generator object
-instances, so concrete-type introspection such as `inspect.isgenerator()` or
-`inspect.isasyncgen()` may not identify them as generators. Likewise, the
-decorated callable itself is a regular wrapper function, so
-`inspect.isgeneratorfunction()` and `inspect.isasyncgenfunction()` may not
-identify it as a generator function.
+wrapper objects that support the full generator protocol and satisfy
+`collections.abc.Generator` / `collections.abc.AsyncGenerator` checks, but they
+are not native generator objects. Code relying on concrete-type introspection
+(`inspect.isgenerator()`, `inspect.isgeneratorfunction()`, and the async
+equivalents) may not recognize them.
 
 When a synchronous function returns an awaitable object, timing ends when that
 object is returned. Awaiting or consuming that object is not measured.
