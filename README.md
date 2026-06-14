@@ -135,6 +135,18 @@ load_data()
 The decorator prints elapsed time to stdout by default. Pass `exit_callback` to
 send elapsed seconds to logging, metrics, stderr, or another destination.
 
+Generator functions are timed during consumption, not object creation. They
+report elapsed time when exhausted, when an exception leaves the wrapper, or
+when explicitly closed. Time spent between yielded values is excluded, so
+generator timing measures the generator body rather than the consumer's work
+between pulls. For partially consumed async generators, event-loop or
+garbage-collection cleanup can close the underlying generator without invoking
+the decorator callback. Fully consume the async generator or call
+`await generator.aclose()` when elapsed time must be reported.
+
+Decorated generator and async generator callables return protocol-compatible
+wrapper objects; see the `@stopwatch` API notes for introspection details.
+
 ### Custom Callbacks
 
 `Stopwatch` and `@stopwatch` accept an `exit_callback` with the signature
@@ -249,9 +261,32 @@ time the decorated function exits. The output includes the callable name and
 elapsed seconds. Use `exit_callback` when timing information should go to
 stderr, logging, metrics, or another destination.
 
-Works on regular functions, callable objects, `async def` functions, and
-callable objects whose `__call__` is async. For async callables, timing covers
-the awaited body until it returns or raises.
+Works on regular functions, callable objects, `async def` functions, generator
+functions, async generator functions, and callable objects whose `__call__` uses
+one of those forms. For async callables, timing covers the awaited body until it
+returns or raises.
+
+For generator and async generator callables, timing starts when the returned
+generator is first consumed. Timing is reported when consumption completes, when
+an exception leaves the wrapper, or when the generator is explicitly closed. For
+partially consumed async generators, fully consume the generator or call
+`await generator.aclose()` when elapsed time must be reported.
+
+Time spent between yielded values is excluded. Generator timing is the sum of
+time spent executing the generator body, including cleanup run by `close()` or
+`aclose()`. To measure the wall-clock duration of an entire consumption session,
+wrap the consumer loop with `Stopwatch` instead.
+
+Decorated generator and async generator callables return protocol-compatible
+wrapper objects. They support the relevant generator protocol methods (`send`,
+`throw`, and `close` for generators; `asend`, `athrow`, and `aclose` for async
+generators), and satisfy `collections.abc.Generator` or
+`collections.abc.AsyncGenerator` checks. They are not native generator object
+instances, so concrete-type introspection such as `inspect.isgenerator()` or
+`inspect.isasyncgen()` may not identify them as generators. Likewise, the
+decorated callable itself is a regular wrapper function, so
+`inspect.isgeneratorfunction()` and `inspect.isasyncgenfunction()` may not
+identify it as a generator function.
 
 When a synchronous function returns an awaitable object, timing ends when that
 object is returned. Awaiting or consuming that object is not measured.
