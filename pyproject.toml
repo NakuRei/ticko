@@ -29,6 +29,7 @@ dependencies = []
 Homepage = "https://github.com/NakuRei/ticko"
 Repository = "https://github.com/NakuRei/ticko"
 Issues = "https://github.com/NakuRei/ticko/issues"
+Changelog = "https://github.com/NakuRei/ticko/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["uv_build>=0.11.16,<0.12.0"]
