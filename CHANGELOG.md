@@ -59,11 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Lap timing support
   - Elapsed time measurement
 - `@stopwatch` decorator for easy function timing
-- Thread-safe implementation using locks
+- Thread-safe implementation
 - Type hints support with `py.typed`
-- Comprehensive test suite with pytest
-- CI/CD pipeline with GitHub Actions
-- Code coverage reporting with Codecov
 
 [unreleased]: https://github.com/NakuRei/ticko/compare/v2.0.0...HEAD
 [2.0.0]: https://github.com/NakuRei/ticko/compare/v1.0.0...v2.0.0
