@@ -25,7 +25,7 @@ GitHub Actions uses **Trusted Publishing** (secure and no API tokens required).
    - **PyPI Project Name**: `ticko`
    - **Owner**: `NakuRei` (your GitHub username)
    - **Repository name**: `ticko`
-   - **Workflow name**: `publish.yml`
+   - **Workflow name**: `test-publish.yml`
    - **Environment name**: `testpypi`
 5. Click **Add**
 
@@ -71,6 +71,14 @@ GitHub Actions uses **Trusted Publishing** (secure and no API tokens required).
 
 ## Usage
 
+Publishing is split across two workflows with different triggers:
+
+- `test-publish.yml` runs on **pull requests to `main`** and publishes to **TestPyPI**
+  (with `skip-existing`, so re-pushing the same version is fine). This validates
+  packaging before merge.
+- `publish.yml` runs on a **`v*.*.*` tag push** and publishes to **production PyPI**,
+  then creates a GitHub Release.
+
 ### Publish a New Version
 
 1. **Update version in pyproject.toml**
@@ -91,18 +99,21 @@ GitHub Actions uses **Trusted Publishing** (secure and no API tokens required).
    git push origin v0.1.1
    ```
 
-4. **Automated publishing flow**
+4. **Automated publishing flow** (triggered by the tag push)
    ```
-   Push tag
+   Push tag (v*.*.*)
      |
      v
-   GitHub Actions triggered
+   publish.yml triggered
      |
      v
-   Publish to TestPyPI
+   Verify tag matches pyproject.toml version
      |
      v
-   Wait for manual approval
+   Build package (uv build)
+     |
+     v
+   Wait for manual approval (pypi environment)
      |
      v
    Publish to PyPI
@@ -110,6 +121,9 @@ GitHub Actions uses **Trusted Publishing** (secure and no API tokens required).
      v
    Create GitHub Release
    ```
+
+   Note: TestPyPI publishing is **not** part of this flow. It happens earlier,
+   on pull requests to `main`, via `test-publish.yml`.
 
 ---
 

@@ -1,10 +1,10 @@
-"""Recording lap times with StopWatch."""
+"""Recording lap times with Stopwatch."""
 
 import time
 
-from ticko import StopWatch
+from ticko import Stopwatch
 
-sw = StopWatch()
+sw = Stopwatch()
 sw.start()
 
 # Record multiple laps

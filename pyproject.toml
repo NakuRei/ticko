@@ -1,6 +1,6 @@
 [project]
 name = "ticko"
-version = "1.0.0"
+version = "2.0.0"
 description = "Thread-safe stopwatch for measuring elapsed time"
 readme = "README.md"
 authors = [
@@ -8,15 +8,17 @@ authors = [
 ]
 requires-python = ">=3.10"
 keywords = ["stopwatch", "timer", "performance", "profiling", "benchmark"]
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Benchmark",
     "Typing :: Typed",
@@ -27,25 +29,38 @@ dependencies = []
 Homepage = "https://github.com/NakuRei/ticko"
 Repository = "https://github.com/NakuRei/ticko"
 Issues = "https://github.com/NakuRei/ticko/issues"
+Changelog = "https://github.com/NakuRei/ticko/blob/main/CHANGELOG.md"
 
 [build-system]
-requires = ["uv_build>=0.9.4,<0.10.0"]
+requires = ["uv_build>=0.11.16,<0.12.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "lxml>=6.0.2",
-    "mypy>=1.18.2",
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.14.1",
+    "lxml>=6.1.1",
+    "mypy>=2.1.0",
+    "pre-commit>=4.6.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.14",
     "ticko",
 ]
+
+[tool.uv.workspace]
+members = [
+    ".",
+]
+
+[tool.uv.sources]
+ticko = { workspace = true, editable = true }
 
 [tool.ruff]
 line-length = 80
 indent-width = 4
 target-version = "py310"
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -55,17 +70,89 @@ ignore = [
     "D213", # multi-line-summary-second-line
     "COM812", # disabled to prevent conflicts with the formatter (trailing comma handling)
 ]
-per-file-ignores = { "examples/**" = ["T201", "INP001"], "tests/**" = ["INP001", "PLR2004", "ARG005", "D401", "D404", "TRY003", "EM101", "BLE001", "PERF203"] }
+[tool.ruff.lint.per-file-ignores]
+"examples/**" = [
+    "INP001",  # allow missing an __init__.py file
+    "T201",  # allow print statements
+]
+"scripts/**" = [
+    "INP001",  # allow missing an __init__.py file
+    "T201",  # allow print statements
+]
+"tests/**" = [
+    "INP001",  # allow missing an __init__.py file
+    "PLR2004",  # allow magic numbers
+    "ARG005",  # allow unused lambda function
+    "ANN201",  # allow missing return type annotation
+    "ANN401",  # use Any for arguments type annotation
+    "D401",  # non-imperative-mood in docstring
+    "D404",  # allow docstring starting with "this"
+    "TRY003",  # allow rising vanilla exception
+    "EM101",  # allow raw string in exception
+    "BLE001",  # allow f-string in exception
+    "PERF203",  # allow using try-except in loop
+]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
 
-[tool.uv.workspace]
-members = [
-    ".",
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = false
+disallow_untyped_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = false
+implicit_optional = false
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_return_any = true
+warn_unreachable = true
+allow_untyped_globals = false
+allow_redefinition_new = false
+allow_redefinition = false
+strict_equality = true
+implicit_reexport = false
+strict_equality_for_none = true
+show_error_context = true
+show_column_numbers = true
+pretty = true
+color_output = true
+error_summary = true
+show_traceback = false
+# any_exprs_report = "mypy_reports/any_exprs_report"
+# html_report = "mypy_reports/html_report"
+# txt_report = "mypy_reports/txt_report"
+warn_unused_configs = true
+
+[tool.pytest]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
 ]
 
-[tool.uv.sources]
-ticko = { workspace = true, editable = true }
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "def __str__",
+    "def __repr__",
+    "raise NotImplementedError",
+    "raise AssertionError",
+]

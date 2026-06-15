@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - name: Checkout code
@@ -32,10 +32,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
-        run: uv run pytest tests/ -v
-
-      - name: Run tests with coverage
-        run: uv run pytest tests/ --cov=src/ticko --cov-report=xml --cov-report=term-missing --cov-fail-under=90
+        run: uv run pytest tests/ -v --cov=src/ticko --cov-report=xml --cov-report=term-missing --cov-fail-under=90
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.10'
@@ -63,13 +60,13 @@ jobs:
         run: uv sync --dev
 
       - name: Run ruff check
-        run: uv run ruff check src/ tests/ examples/
+        run: uv run ruff check src/ tests/ examples/ scripts/
 
       - name: Run ruff format check
-        run: uv run ruff format --check src/ tests/ examples/
+        run: uv run ruff format --check src/ tests/ examples/ scripts/
 
       - name: Run mypy
-        run: uv run mypy src/ticko examples/
+        run: uv run mypy src/ticko examples/ tests/ scripts/
 
   build:
     name: Build Package
@@ -92,10 +89,22 @@ jobs:
       - name: Build package
         run: uv build
 
-      - name: Check package contents
+      - name: List package contents
         run: |
           ls -lh dist/
-          uv run python -m tarfile -l dist/*.tar.gz
+          uv run --no-project python -m tarfile -l dist/*.tar.gz
+          uv run --no-project python -m zipfile -l dist/*.whl
+
+      - name: Verify py.typed is bundled in sdist and wheel
+        run: uv run --no-project python scripts/check_distribution_typed.py dist
+
+      - name: Verify the installed wheel exposes types (PEP 561)
+        run: |
+          uv venv /tmp/typecheck
+          uv pip install --python /tmp/typecheck/bin/python dist/*.whl mypy
+          printf '[mypy]\n' > /tmp/consumer-mypy.ini
+          printf 'from ticko import Stopwatch\nreveal_type(Stopwatch())\n' > /tmp/consumer.py
+          /tmp/typecheck/bin/mypy --config-file /tmp/consumer-mypy.ini /tmp/consumer.py
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

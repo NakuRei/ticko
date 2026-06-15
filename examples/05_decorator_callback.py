@@ -2,15 +2,12 @@
 
 import time
 
-from ticko import StopWatch, stopwatch
+from ticko import stopwatch
 
 
-def custom_callback(sw: StopWatch) -> None:
-    """Log execution time.
-
-    Custom callback to log execution time.
-    """
-    print(f"Function took {sw.time_elapsed:.3f} seconds")
+def custom_callback(elapsed: float) -> None:
+    """Print the measured execution time."""
+    print(f"Function took {elapsed:.3f} seconds")
 
 
 @stopwatch(exit_callback=custom_callback)

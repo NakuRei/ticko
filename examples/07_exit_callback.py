@@ -1,21 +1,21 @@
-"""Using exit callback with StopWatch."""
+"""Using exit callback with Stopwatch."""
 
 import time
 
-from ticko import StopWatch
+from ticko import Stopwatch
 
 
-def on_stop(sw: StopWatch) -> None:
+def on_stop(elapsed: float) -> None:
     """Print stopwatch elapsed time.
 
     Called automatically when stopwatch stops.
     """
     print("Stopwatch stopped!")
-    print(f"Total elapsed time: {sw.time_elapsed:.3f} seconds")
+    print(f"Total elapsed time: {elapsed:.3f} seconds")
 
 
 # Create stopwatch with exit callback
-sw = StopWatch(exit_callback=on_stop)
+sw = Stopwatch(exit_callback=on_stop)
 sw.start()
 
 time.sleep(0.8)

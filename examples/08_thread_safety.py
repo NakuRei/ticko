@@ -1,24 +1,29 @@
 """Thread-safe lap timing with multiple threads.
 
 This demonstrates that multiple threads can safely call lap() on a shared
-StopWatch instance.
+Stopwatch instance.
 """
 
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from ticko import StopWatch
+from ticko import Stopwatch
 
 
-def worker(task_id: int, sw: StopWatch) -> tuple[int, float]:
+def worker(task_id: int, sw: Stopwatch) -> tuple[int, float]:
     """Simulate work and record a lap time.
 
-    Args:
-        task_id: Task identifier
-        sw: Shared StopWatch instance
+    Parameters
+    ----------
+    task_id : int
+        Task identifier.
+    sw : Stopwatch
+        Shared Stopwatch instance.
 
-    Returns:
-        Tuple of (task_id, lap_time)
+    Returns
+    -------
+    tuple[int, float]
+        Tuple of (task_id, lap_time).
 
     """
     # Simulate work with varying duration per task
@@ -32,8 +37,8 @@ def worker(task_id: int, sw: StopWatch) -> tuple[int, float]:
 
 
 def main() -> None:
-    """Run multiple threads sharing a single StopWatch."""
-    sw = StopWatch()
+    """Run multiple threads sharing a single Stopwatch."""
+    sw = Stopwatch()
     sw.start()
 
     # Run 5 tasks concurrently

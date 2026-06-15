@@ -6,14 +6,9 @@ on:
       - 'v*.*.*'  # Triggered by tags like v0.1.0, v1.0.0, etc.
 
 jobs:
-  pypi:
-    name: Publish to PyPI
+  build:
+    name: Build Package
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/ticko/
-    permissions:
-      id-token: write  # For trusted publishing
 
     steps:
       - name: Checkout code
@@ -22,7 +17,27 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
+
+      - name: Verify tag matches package version
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          with Path("pyproject.toml").open("rb") as pyproject_file:
+              package_version = tomllib.load(pyproject_file)["project"]["version"]
+          tag_version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+
+          if package_version != tag_version:
+              print(
+                  f"Tag version {tag_version} does not match package version {package_version}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          PY
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -31,6 +46,32 @@ jobs:
 
       - name: Build package
         run: uv build
+
+      - name: Verify py.typed is bundled in sdist and wheel
+        run: uv run --no-project python scripts/check_distribution_typed.py dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/ticko/
+    permissions:
+      id-token: write  # For trusted publishing
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

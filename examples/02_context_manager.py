@@ -1,11 +1,11 @@
-"""Using StopWatch as a context manager."""
+"""Using Stopwatch as a context manager."""
 
 import time
 
-from ticko import StopWatch
+from ticko import Stopwatch
 
 # Use as context manager (automatically starts and stops)
-with StopWatch() as sw:
+with Stopwatch() as sw:
     time.sleep(1)
     print(f"Still running: {sw.time_elapsed:.3f} seconds")
 
