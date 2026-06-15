@@ -75,6 +75,10 @@ ignore = [
     "INP001",  # allow missing an __init__.py file
     "T201",  # allow print statements
 ]
+"scripts/**" = [
+    "INP001",  # allow missing an __init__.py file
+    "T201",  # allow print statements
+]
 "tests/**" = [
     "INP001",  # allow missing an __init__.py file
     "PLR2004",  # allow magic numbers
